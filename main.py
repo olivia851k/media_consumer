@@ -27,25 +27,57 @@ def generate_state_list(iterations, start_breathing, end_breathing):
     state_list.append(WatchState.ESCAPED)
     return state_list
 
-def get_next_state(state, iterations, i, play_pressed, escape_pressed, quit_pressed, start_breathing, end_breathing):
+# question as to whether to add in a breathing state after a manual pause if start_breathing == True
+def get_next_state(state, iterations, i, space_pressed, escape_pressed, quit_pressed, start_breathing, end_breathing, should_skip):
     next_state = WatchState.ESCAPED
-    if state == WatchState.ESCAPED:
+    if escape_pressed:
+        next_state = WatchState.ESCAPED
+    elif state == WatchState.ESCAPED:
         if start_breathing:
             next_state = WatchState.BREATHING
         else:
             next_state = WatchState.LINGERING_CAPTIONS
+            i += 1
+    elif state == WatchState.BREATHING:
+        if space_pressed:
+            next_state = WatchState.MANUAL_PLAY
+        else:
+            if i == iterations:
+                next_state = WatchState.ESCAPED
+            else:
+                next_state = WatchState.LINGERING_CAPTIONS
+                i += 1
     elif state == WatchState.LINGERING_CAPTIONS:
         if space_pressed:
             next_state = WatchState.MANUAL_PAUSED
         else:
             next_state = WatchState.PLAYING
     elif state == WatchState.PLAYING:
-        next_state = WatchState.PRE_CAPTIONS
-    elif state = WatchState.PRE_CAPTIONS:
-        next_state = WatchState.
+        if space_pressed:
+            next_state = WatchState.MANUAL_PAUSED
+        else:
+            next_state = WatchState.PRE_CAPTIONS
+    elif state == WatchState.PRE_CAPTIONS:
+        if space_pressed:
+            next_state = WatchState.MANUAL_PAUSED
+        else:
+            if i == iterations:
+                if end_breathing:
+                    next_state = WatchState.BREATHING
+                else:
+                    next_state = WatchState.ESCAPED
+            else:
+                next_state = WatchState.BREATHING
     elif state == WatchState.MANUAL_PAUSED:
         # might skip an iteration depending on the timestamp of the last lingering captions
-        next_state = WatchState.LINGERING_CAPTIONS
+        if space_pressed:
+            if should_skip:
+                i += 1
+            next_state = WatchState.LINGERING_CAPTIONS
+        else:
+            next_state = WatchState.ESCAPED
+    #manual play, end clause
+    return next_state, i
 
 
 class GUI:
