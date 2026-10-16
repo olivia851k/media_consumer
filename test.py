@@ -2,19 +2,26 @@ import pytest
 
 from main import *
 
-def compare_state_sequence(sequence, iterations, start_breathing, end_breathing):
+def compare_state_sequence(sequence, iterations, start_breathing, end_breathing, space_sequence = None, escape_i = -1, quit_i = -1, should_skip=False):
     # could change to all options allowed to be lists that change over time
     state = WatchState.ESCAPED
     next_state = WatchState.PLAYING
     history = [state]
     i = 0
 #    while next_state != WatchState.ESCAPED:
-    for j in range(0, 40):
-        next_state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
+    max_iterations = 50
+    for j in range(0, max_iterations):
+        space_press = False
+        if space_sequence and j < len(space_sequence):
+            space_press = space_sequence[j]
+        next_state, i = get_next_state(state, iterations, i, space_press, escape_i == j, quit_i == j, start_breathing, end_breathing, should_skip)
         state = next_state
+        print(state, i)
         history.append(state)
         if state == WatchState.ESCAPED:
             break
+        if j == max_iterations - 1:
+            assert False
     assert history == sequence
     assert i == iterations
 
@@ -69,37 +76,74 @@ class TestWatch:
         compare_state_sequence(sequence, 1, True, True)
 
     def test_next_state_1pp(self):
-        state = WatchState.ESCAPED
-        start_breathing = False
-        end_breathing = False
-        iterations = 1
-        i = 0
-        state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.LINGERING_CAPTIONS
-        state, i = get_next_state(state, iterations, i, True, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.MANUAL_PAUSED
-        state, i = get_next_state(state, iterations, i, True, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.LINGERING_CAPTIONS
-        state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.PLAYING
-        state, i = get_next_state(state, iterations, i, True, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.MANUAL_PAUSED
-        state, i = get_next_state(state, iterations, i, True, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.LINGERING_CAPTIONS
-        state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.PLAYING
-        state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.PRE_CAPTIONS
-        state, i = get_next_state(state, iterations, i, True, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.MANUAL_PAUSED
-        state, i = get_next_state(state, iterations, i, True, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.LINGERING_CAPTIONS
-        state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.PLAYING
-        state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.PRE_CAPTIONS
-        state, i = get_next_state(state, iterations, i, False, False, False, start_breathing, end_breathing, False)
-        assert state == WatchState.ESCAPED
-        assert i == iterations
+        sequence = [WatchState.ESCAPED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.MANUAL_PAUSED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.PLAYING,
+                    WatchState.MANUAL_PAUSED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.PLAYING,
+                    WatchState.PRE_CAPTIONS,
+                    WatchState.MANUAL_PAUSED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.PLAYING,
+                    WatchState.PRE_CAPTIONS,
+                    WatchState.ESCAPED]
+        space_sequence = [False,
+                          True,
+                          True,
+                          False,
+                          True,
+                          True,
+                          False,
+                          False,
+                          True,
+                          True,
+                          False,
+                          False,
+                          False]
+        compare_state_sequence(sequence, 1, False, False, space_sequence)
+
+    def test_next_state_1ps(self):
+        sequence = [WatchState.ESCAPED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.MANUAL_PAUSED,
+                    WatchState.ESCAPED]
+        space_sequence = [False,
+                          True,
+                          True,
+                          False]
+        compare_state_sequence(sequence, 1, False, False, space_sequence, should_skip=True)
+
+    def test_next_state_4ps(self):
+        sequence = [WatchState.ESCAPED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.MANUAL_PAUSED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.PLAYING,
+                    WatchState.MANUAL_PAUSED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.PLAYING,
+                    WatchState.PRE_CAPTIONS,
+                    WatchState.MANUAL_PAUSED,
+                    WatchState.LINGERING_CAPTIONS,
+                    WatchState.PLAYING,
+                    WatchState.PRE_CAPTIONS,
+                    WatchState.ESCAPED]
+        space_sequence = [False,
+                          True,
+                          True,
+                          False,
+                          True,
+                          True,
+                          False,
+                          False,
+                          True,
+                          True,
+                          False,
+                          False,
+                          False]
+        compare_state_sequence(sequence, 4, False, False, space_sequence, should_skip=True)
 
 

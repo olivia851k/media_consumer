@@ -71,9 +71,15 @@ def get_next_state(state, iterations, i, space_pressed, escape_pressed, quit_pre
     elif state == WatchState.MANUAL_PAUSED:
         # might skip an iteration depending on the timestamp of the last lingering captions
         if space_pressed:
-            if should_skip:
-                i += 1
-            next_state = WatchState.LINGERING_CAPTIONS
+            if i == iterations and should_skip:
+                if end_breathing:
+                    next_state = WatchState.BREATHING
+                else:
+                    next_state = WatchState.ESCAPED
+            else:
+                if should_skip:
+                    i += 1
+                next_state = WatchState.LINGERING_CAPTIONS
         else:
             next_state = WatchState.ESCAPED
     #manual play, end clause
