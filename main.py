@@ -13,6 +13,20 @@ class WatchState(Enum):
     MANUAL_PLAY = 6
     QUITTING = 7
 
+class WatchAction(Enum):
+    FOCUS_PLAYER = 0
+    FOCUS_SELF = 1
+    PLAYING = 2
+    ENABLE_CAPTIONS = 3
+    DISABLE_CAPTIONS = 4
+    FULLSCREEN = 5
+
+class WatchInput(Enum):
+    NONE = 0
+    FULLSCREEN = 1
+    QUIT = 2
+    PLAYING = 3
+
 def generate_state_list(iterations, start_breathing, end_breathing):
     state_list = [WatchState.ESCAPED]
     if start_breathing:
@@ -27,10 +41,13 @@ def generate_state_list(iterations, start_breathing, end_breathing):
     state_list.append(WatchState.ESCAPED)
     return state_list
 
+def invalid_state_transition(state, new_state):
+    raise Exception(f'Invalid transition from {state.name} to {new_state.name}')
+
 # question as to whether to add in a breathing state after a manual pause if start_breathing == True
-def get_next_state(state, iterations, i, space_pressed, escape_pressed, quit_pressed, start_breathing, end_breathing, should_skip):
+def get_next_state(state, iterations, i, watch_input, start_breathing, end_breathing, should_skip):
     next_state = WatchState.ESCAPED
-    if escape_pressed:
+    if watch_input == WatchInput.FULLSCREEN:
         next_state = WatchState.ESCAPED
     elif state == WatchState.ESCAPED:
         if start_breathing:
@@ -39,7 +56,7 @@ def get_next_state(state, iterations, i, space_pressed, escape_pressed, quit_pre
             next_state = WatchState.LINGERING_CAPTIONS
             i += 1
     elif state == WatchState.BREATHING:
-        if space_pressed:
+        if watch_input == WatchInput.PLAYING:
             next_state = WatchState.MANUAL_PLAY
         else:
             if i == iterations:
@@ -48,17 +65,17 @@ def get_next_state(state, iterations, i, space_pressed, escape_pressed, quit_pre
                 next_state = WatchState.LINGERING_CAPTIONS
                 i += 1
     elif state == WatchState.LINGERING_CAPTIONS:
-        if space_pressed:
+        if watch_input == WatchInput.PLAYING:
             next_state = WatchState.MANUAL_PAUSED
         else:
             next_state = WatchState.PLAYING
     elif state == WatchState.PLAYING:
-        if space_pressed:
+        if watch_input == WatchInput.PLAYING:
             next_state = WatchState.MANUAL_PAUSED
         else:
             next_state = WatchState.PRE_CAPTIONS
     elif state == WatchState.PRE_CAPTIONS:
-        if space_pressed:
+        if watch_input == WatchInput.PLAYING:
             next_state = WatchState.MANUAL_PAUSED
         else:
             if i == iterations:
@@ -70,7 +87,7 @@ def get_next_state(state, iterations, i, space_pressed, escape_pressed, quit_pre
                 next_state = WatchState.BREATHING
     elif state == WatchState.MANUAL_PAUSED:
         # might skip an iteration depending on the timestamp of the last lingering captions
-        if space_pressed:
+        if watch_input == WatchInput.PLAYING:
             if i == iterations and should_skip:
                 if end_breathing:
                     next_state = WatchState.BREATHING
@@ -82,9 +99,96 @@ def get_next_state(state, iterations, i, space_pressed, escape_pressed, quit_pre
                 next_state = WatchState.LINGERING_CAPTIONS
         else:
             next_state = WatchState.ESCAPED
-    #manual play, end clause
+        #manual play, end clause
+    elif state == WatchState.MANUAL_PLAY:
+        if i == iterations:
+            next_state = WatchState.ESCAPED
+        else:
+            next_state = WatchState.LINGERING_CAPTIONS
+            i += 1
     return next_state, i
 
+
+def change_state(state, new_state):
+    action_sequence = []
+    if state == WatchState.ESCAPED:
+        if new_state == WatchState.BREATHING:
+            action_sequence.append(WatchAction.FOCUS_PLAYER)
+        elif new_state == WatchState.LINGERING_CAPTIONS:
+            action_sequence.extend([WatchAction.FOCUS_PLAYER,
+                                    WatchAction.PLAYING])
+        else:
+            invalid_state_transition(state, new_state)
+    elif state == WatchState.BREATHING:
+        if new_state == WatchState.LINGERING_CAPTIONS:
+            action_sequence.append(WatchAction.PLAYING)
+        elif new_state == WatchState.MANUAL_PLAY:
+            pass
+        elif new_state == WatchState.ESCAPED:
+            action_sequence.append(WatchAction.FOCUS_SELF)
+        else:
+            invalid_state_transition(new_state)
+    elif state == WatchState.LINGERING_CAPTIONS:
+        if new_state == WatchState.PLAYING:
+            action_sequence.append(WatchAction.DISABLE_CAPTIONS)
+        elif new_state == WatchState.MANUAL_PAUSED:
+            pass
+        elif new_state == WatchState.ESCAPED:
+            action_sequence.extend([WatchAction.PLAYING,
+                                    WatchAction.FOCUS_SELF])
+        elif new_state == WatchState.QUITTING:
+            action_sequence.extend([WatchAction.FULLSCREEN,
+                                    WatchAction.FOCUS_SELF])
+        else:
+            invalid_state_transition(new_state)
+    elif state == WatchState.PLAYING:
+        if new_state == WatchState.PRE_CAPTIONS:
+            action_sequence.append(WatchAction.ENABLE_CAPTIONS)
+        elif new_state == WatchState.MANUAL_PAUSED:
+            action_sequence.append(WatchAction.ENABLE_CAPTIONS)
+        elif new_state == WatchState.ESCAPED:
+            action_sequence.extend([WatchAction.PLAYING,
+                                    WatchAction.ENABLE_CAPTIONS,
+                                    WatchAction.FOCUS_SELF])
+        elif new_state == WatchState.QUITTING:
+            action_sequence.extend([WatchAction.FULLSCREEN,
+                                    WatchAction.ENABLE_CAPTIONS,
+                                    WatchAction.FOCUS_SELF])
+        else:
+            invalid_state_transition(new_state)
+    elif state == WatchState.PRE_CAPTIONS:
+        if new_state == WatchState.BREATHING:
+            action_sequence.append(WatchAction.PLAYING)
+        elif new_state == WatchState.MANUAL_PAUSED:
+            pass
+        elif new_state == WatchState.ESCAPED:
+            action_sequence.extend([WatchAction.PLAYING,
+                                    WatchAction.FOCUS_SELF])
+        elif new_state == WatchState.QUITTING:
+            action_sequence.extend([WatchAction.FULLSCREEN,
+                                    WatchAction.FOCUS_SELF])
+        else:
+            invalid_state_transition(new_state)
+    elif state == WatchState.MANUAL_PAUSED:
+        if new_state == WatchState.LINGERING_CAPTIONS:
+            pass
+        elif new_state == WatchState.PLAYING:
+            action_sequence.append(WatchAction.DISABLE_CAPTIONS)
+        elif new_state == WatchState.PRE_CAPTIONS:
+            pass
+        elif new_state == WatchState.ESCAPED:
+            action_sequence.append(WatchAction.FOCUS_SELF)
+            pass
+        else:
+            invalid_state_transition(new_state)
+    elif state == WatchState.MANUAL_PLAY:
+        if new_state == WatchState.LINGERING_CAPTIONS:
+            pass
+        elif new_state == WatchState.ESCAPED:
+            pass
+        else:
+            invalid_state_transition(new_state)
+    state = new_state
 
 class GUI:
     def __init__(self):
@@ -125,8 +229,6 @@ class Consumer:
         self.state = WatchState.ESCAPED
         self.resume_time = resume_time
 
-    def invalid_state_transition(self, new_state):
-        raise Exception(f'Invalid transition from {self.state.name} to {new_state.name}')
 
     def current_state(self):
         return self.state_list[self.state_i]
@@ -153,80 +255,6 @@ class Consumer:
                 break
             state_i += 1
         return state_i, total_time - at_time
-
-    def change_state(self, state, new_state):
-        if state == WatchState.ESCAPED:
-            if new_state == WatchState.BREATHING:
-                # alt tab
-                pass
-            elif new_state == WatchState.LINGERING_CAPTIONS:
-                # play 
-                pass
-            elif new_state == WatchState.PLAYING:
-                pass
-            elif new_state == WatchState.PRE_CAPTIONS:
-                pass
-        elif state == WatchState.BREATHING:
-            if new_state == WatchState.LINGERING_CAPTIONS:
-                pass
-            elif new_state == WatchState.MANUAL_PLAY:
-                pass
-            elif new_state == WatchState.ESCAPED:
-                pass
-            else:
-                self.invalid_state_transition(new_state)
-        elif state == WatchState.LINGERING_CAPTIONS:
-            if new_state == WatchState.PLAYING:
-                pass
-            elif new_state == WatchState.MANUAL_PAUSED:
-                pass
-            elif new_state == WatchState.ESCAPED:
-                pass
-            elif new_state == WatchState.QUITTING:
-                pass
-            else:
-                self.invalid_state_transition(new_state)
-        elif state == WatchState.PLAYING:
-            if new_state == WatchState.PRE_CAPTIONS:
-                pass
-            elif new_state == WatchState.MANUAL_PAUSED:
-                pass
-            elif new_state == WatchState.ESCAPED:
-                pass
-            elif new_state == WatchState.QUITTING:
-                pass
-            else:
-                self.invalid_state_transition(new_state)
-        elif state == WatchState.PRE_CAPTIONS:
-            if new_state == WatchState.BREATHING:
-                pass
-            elif new_state == WatchState.MANUAL_PAUSED:
-                pass
-            elif new_state == WatchState.ESCAPED:
-                pass
-            elif new_state == WatchState.QUITTING:
-                pass
-            else:
-                self.invalid_state_transition(new_state)
-        elif state == WatchState.MANUAL_PAUSED:
-            if new_state == WatchState.LINGERING_CAPTIONS:
-                pass
-            elif new_state == WatchState.PLAYING:
-                pass
-            elif new_state == WatchState.PRE_CAPTIONS:
-                pass
-            elif new_state == WatchState.ESCAPED:
-                pass
-            else:
-                self.invalid_state_transition(new_state)
-        elif state == WatchState.MANUAL_PLAY:
-            if new_state == WatchState.LINGERING_CAPTIONS:
-                pass
-            elif new_state == WatchState.ESCAPED:
-                pass
-            else:
-                self.invalid_state_transition(new_state)
-        state = new_state
 
     def watch(self):
         self.state = WatchState.ESCAPED
