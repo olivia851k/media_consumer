@@ -188,7 +188,8 @@ def change_state(state, new_state):
             pass
         else:
             invalid_state_transition(new_state)
-    state = new_state
+    return action_sequence
+
 
 class GUI:
     def __init__(self):
@@ -202,22 +203,35 @@ class GUI:
         self.captions_position = 1
         self.iterations = 3
 
+class Program:
+    def __init__(self, captions_key):
+        self.captions_key = captions_key
+
+    def press(self, action):
+        if action == WatchState.ENABLE_CAPTIONS or action == WatchState.DISABLE_CAPTIONS:
+            pyautogui.press(self.captions_key)
+
 # interactive style watch :)
-def watch():
-    consumer = Consumer(iterations, breathing_time, playing_time, 5, True, True, False, True, captions_count, captions_posiition, 0.1)
+def watch(playing_time, breathing_time, iterations, program_name, captions_count=1, captions_position=1):
+    program = Program('c')
+    if program_name == 'vlc':
+        program = Program('v')
+    consumer = Consumer(iterations, breathing_time, playing_time, program, 5, True, True, False, True, captions_count, captions_posiition, 0.1)
+    consumer.watch()
 
 # the cheeky edge cases are what happens when the user pressed a button during transition
 class Consumer:
-    def __init__(self, press_key, watch_wait,
-            iterations, breathing_time, playing_time,
+    def __init__(self, iterations, breathing_time, playing_time, program,
             playing_captions_time, lingering_captions, pre_captions,
             start_breathing, end_breathing,
             captions_count, captions_position, additional_captions_time,
-            resume_time):
-        self.press_key = press_key
-        self.watch_wait = watch_wait # returns elapsed_time, keys_pressed
+            state_history=None):
+#        self.press_key = press_key
+#        self.watch_wait = watch_wait # returns elapsed_time, keys_pressed
         self.breathing_time = breathing_time
         self.playing_time = playing_time
+        self.iterations = iterations
+        self.program = program
         self.captions_count = captions_count
         self.captions_position = captions_position
         self.lingering_captions_time = playing_captions_time
@@ -228,10 +242,37 @@ class Consumer:
         self.start_time = 0
         self.state = WatchState.ESCAPED
         self.resume_time = resume_time
+        if state_history:
+            self.state_history = state_history
+        else:
+            self.state_history = [] # (state, time)
 
 
     def current_state(self):
         return self.state_list[self.state_i]
+
+    def press_pyautogui(self, action):
+        if action == WatchAction.FOCUS_PLAYER:
+            time.sleep(0.6)
+            pyautogui.hotkey('alt', 'tab')
+        elif action == WatchAction.FOCUS_SELF:
+            time.sleep(0.6)
+            pyautogui.hotkey('alt', 'tab')
+        elif action == WatchAction.PLAYING:
+            time.sleep(0.1)
+            pyautogui.press('space')
+        elif action == WatchAction.ENABLE_CAPTIONS:
+            for i in range(self.captions_position):
+                time.sleep(self.additional_captions_time)
+                self.program.press(action)
+        elif action == WatchAction.DISABLE_CAPTIONS:
+            for i in range(1+self.captions_count-self.captions_position):
+                time.sleep(self.additional_captions_time)
+                self.program.press(action)
+        elif action == WatchAction.FULLSCREEN:
+            time.sleep(0.3)
+            pyautogui.press('f')
+
 
     def get_state_time(self, state):
         state_time = 0
@@ -258,6 +299,12 @@ class Consumer:
 
     def watch(self):
         self.state = WatchState.ESCAPED
-        self.state_i, time_through_state = self.get_state_i_at_time(self.resume_time)
-        self.change_state(self.state, self.current_state())
+        i = 0
+        while self.state != WatchState.ESCAPED or i == 0:
+            next_state, i = get_next_state(self.state, self.iterations, i, WatchInput.NONE, self.start_breathing, self.end_breathing, False)
+            action_sequence = change_state(self.state, next_state)
+            for action in action_sequence:
+                self.press_pyautiogui(action)
+            self.state = next_state
+
 
