@@ -88,7 +88,10 @@ def disable_subs(program, n_sub_tracks, i_sub_track):
 def manual_escape(program, paused, i_sub_track):
     if not paused:
         time.sleep(0.1)
-        pyautogui.press('space')
+        if program == 'el':
+            pyautogui.press('k')
+        else:
+            pyautogui.press('space')
         enable_subs(program, i_sub_track)
     time.sleep(0.5)
     pyautogui.hotkey('alt', 'tab')
@@ -117,7 +120,10 @@ def watch(play_time, pause_time, count, program, n_sub_tracks=0, i_sub_track=0, 
     i = 0
     while i < count:
         if watcher.paused:
-            pyautogui.press('space')
+            if program == 'el':
+                pyautogui.press('k')
+            else:
+                pyautogui.press('space')
         watcher.paused = False
         disable_subs(program, n_sub_tracks, i_sub_track)
         changed = sleep_not_paused(play_time, program, watcher, i_sub_track)
@@ -140,7 +146,10 @@ def watch(play_time, pause_time, count, program, n_sub_tracks=0, i_sub_track=0, 
                     return
                 elif not watcher.paused:
                     continue
-        pyautogui.press('space')
+        if program == 'el':
+            pyautogui.press('k')
+        else:
+            pyautogui.press('space')
         watcher.paused = True
         changed = sleep_eye_open(pause_time, watcher)
         if changed:
@@ -152,7 +161,10 @@ def watch(play_time, pause_time, count, program, n_sub_tracks=0, i_sub_track=0, 
                 return
             elif not watcher.paused and i == count - 1:
                 time.sleep(0.6)
-                pyautogui.press('space')
+                if program == 'el':
+                    pyautogui.press('k')
+                else:
+                    pyautogui.press('space')
                 watcher.paused = True
                 time.sleep(0.1)
         i += 1
