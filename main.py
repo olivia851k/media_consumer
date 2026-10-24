@@ -1,6 +1,13 @@
 import time
 import copy
 import pyautogui
+import sys
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QTabWidget, QPushButton, QCheckBox, QLineEdit, QComboBox, QSpinBox,
+    QLabel
+)
+from PyQt6.QtCore import Qt
 from pynput import keyboard
 from enum import Enum
 
@@ -23,7 +30,8 @@ class WatchAction(Enum):
     FULLSCREEN = 5
 
 class WatchInput(Enum):
-    NONE = 1000
+    # in order of importance
+    NONE = 1000 # must be a higher number than the rest
     FULLSCREEN = 1
     QUIT = 2
     PLAY = 3
@@ -61,21 +69,6 @@ def key_to_str(key):
     except AttributeError:
         key_str = str(key)[4:]
     return key_str
-
-
-def generate_state_list(iterations, start_breathing, end_breathing):
-    state_list = [WatchState.ESCAPED]
-    if start_breathing:
-        state_list.append(WatchState.BREATHING)
-    for i in range(iterations):
-        state_list.extend([WatchState.LINGERING_CAPTIONS,
-                           WatchState.PLAY,
-                           WatchState.PRE_CAPTIONS,
-                           WatchState.BREATHING])
-    if not end_breathing:
-        state_list = state_list[:-1]
-    state_list.append(WatchState.ESCAPED)
-    return state_list
 
 def invalid_state_transition(state, new_state):
     raise Exception(f'Invalid transition from {state.name} to {new_state.name}')
@@ -155,7 +148,8 @@ def change_state(state, new_state):
     action_sequence = []
     if state == WatchState.ESCAPED:
         if new_state == WatchState.BREATHING:
-            action_sequence.append(WatchAction.FOCUS_PLAYER)
+            action_sequence.extend([WatchAction.FOCUS_PLAYER,
+                                    WatchAction.FULLSCREEN])
         elif new_state == WatchState.LINGERING_CAPTIONS:
             action_sequence.extend([WatchAction.FOCUS_PLAYER,
                                     WatchAction.FULLSCREEN,
@@ -204,7 +198,7 @@ def change_state(state, new_state):
             action_sequence.append(WatchAction.PLAY)
         elif new_state == WatchState.MANUAL_PAUSED:
             pass
-        elif new_state == WatchState.ESCAPED:
+        elif new_state == WatchState.ESCAPED: # broken when not manual escape
             action_sequence.extend([WatchAction.PLAY,
                                     WatchAction.FOCUS_SELF])
         elif new_state == WatchState.QUITTING:
@@ -224,6 +218,8 @@ def change_state(state, new_state):
             pass
         elif new_state == WatchState.MANUAL_PAUSED:
             pass
+        elif new_state == WatchState.BREATHING:
+            pass
         else:
             invalid_state_transition(state, new_state)
     elif state == WatchState.MANUAL_PLAY:
@@ -236,22 +232,106 @@ def change_state(state, new_state):
     return action_sequence
 
 
-class GUI:
+def time_spin_box(label, start_min, start_sec):
+    time_layout = QHBoxLayout()
+    time_min = QSpinBox()
+    time_min.setMaximum(600)
+    time_min.setValue(start_min)
+    time_sec = QSpinBox()
+    time_sec.setMaximum(59)
+    time_sec.setSingleStep(5)
+    time_sec.setValue(start_sec)
+    time_layout.addWidget(QLabel(label))
+    time_layout.addWidget(time_min)
+    time_layout.addWidget(time_sec)
+    return time_layout, time_min, time_sec
+
+
+class GUI(QMainWindow):
     def __init__(self):
-        self.start_breathing = False
-        self.end_breathing = True
-        self.breathing_time = 25
-        self.playing_time = 90
+        super().__init__()
+        self.lingering_captions = False
+        self.pre_captions = True
         self.playing_captions_time = 5
         self.additional_captions_time = 0.1
         self.captions_count = 1 # also used so captions aren't changed by program
         self.captions_position = 1
-        self.iterations = 3
+        self.program = Program('vlc')
+        self.program.captions_key = 'v'
+
+        self.init_gui()
+
+    def init_gui(self):
+        self.setWindowTitle('Media Consumer')
+        self.setGeometry(100, 100, 600, 400)
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout()
+
+        iterations_layout = QHBoxLayout()
+        self.iterations_spin_box = QSpinBox()
+        self.iterations_spin_box.setMaximum(600)
+        self.iterations_spin_box.setMinimum(1)
+        self.iterations_spin_box.setValue(3)
+        iterations_layout.addWidget(QLabel('Iterations'))
+        iterations_layout.addWidget(self.iterations_spin_box)
+
+        playing_time_layout, self.playing_time_min, self.playing_time_sec = time_spin_box('Playing Time:', 1, 30)
+        breathing_time_layout, self.breathing_time_min, self.breathing_time_sec = time_spin_box('Breathing Time:', 0, 25)
+
+        breathing_layout = QHBoxLayout()
+        self.start_breathing_check_box = QCheckBox('Start Breathing')
+        self.end_breathing_check_box = QCheckBox('End Breathing')
+        self.end_breathing_check_box.setCheckState(Qt.CheckState.Checked)
+        breathing_layout.addWidget(self.start_breathing_check_box)
+        breathing_layout.addWidget(self.end_breathing_check_box)
+
+        self.watch_button = QPushButton('Watch')
+        self.watch_button.clicked.connect(self.watch)
+
+        main_layout.addLayout(iterations_layout)
+        main_layout.addLayout(playing_time_layout)
+        main_layout.addLayout(breathing_time_layout)
+        main_layout.addLayout(breathing_layout)
+        main_layout.addWidget(self.watch_button)
+
+        central_widget.setLayout(main_layout)
+
+    @property
+    def iterations(self):
+        return self.iterations_spin_box.value()
+    @property
+    def playing_time(self):
+        return self.playing_time_min.value() * 60 + self.playing_time_sec.value()
+    @property
+    def breathing_time(self):
+        return self.breathing_time_min.value() * 60 + self.breathing_time_sec.value()
+    @property
+    def start_breathing(self):
+        checked_state = self.start_breathing_check_box.checkState()
+        checked = True
+        if checked_state == Qt.CheckState.Unchecked:
+            checked = False
+        return checked
+    @property
+    def end_breathing(self):
+        checked_state = self.end_breathing_check_box.checkState()
+        checked = True
+        if checked_state == Qt.CheckState.Unchecked:
+            checked = False
+        return checked
+
+    def watch(self):
+        self.consumer = Consumer(self.iterations, self.breathing_time, self.playing_time, self.program, self.playing_captions_time, self.lingering_captions, self.pre_captions, self.start_breathing, self.end_breathing, self.captions_count, self.captions_position, self.additional_captions_time)
+        self.consumer.watch()
+
+
 
 class Program:
-    def __init__(self, name, captions_key):
+    def __init__(self, name):
         self.name = name
-        self.captions_key = captions_key
+        self.captions_key = 'c'
         self.fullscreen_key = 'f'
         self.play_key = 'space'
 
@@ -288,9 +368,14 @@ class Program:
 
 # interactive style watch :)
 def watch(playing_time, breathing_time, iterations, program_name, captions_count=1, captions_position=1):
-    program = Program(program_name, 'c')
+    program = Program(program_name)
     if program_name == 'vlc':
-        program = Program(program_name, 'v')
+        program = Program(program_name)
+        program.captions_key = 'v'
+    if program_name == 'tnc':
+        program.play_key = 'k'
+        captions_count = 0
+        captions_position = 0
     consumer = Consumer(iterations, breathing_time, playing_time, program, 5, True, True, False, True, captions_count, captions_position, 0.1)
     consumer.watch()
 
@@ -311,8 +396,13 @@ class Consumer:
         self.end_breathing = end_breathing
         self.captions_count = captions_count
         self.captions_position = captions_position
-        self.lingering_captions_time = playing_captions_time
-        self.pre_captions_time = playing_captions_time + self.captions_position * additional_captions_time
+        if lingering_captions:
+            self.lingering_captions_time = playing_captions_time
+        else:
+            self.lingering_captions_time = additional_captions_time
+        self.pre_captions_time = self.captions_position * additional_captions_time
+        if pre_captions:
+            self.pre_captions_time += playing_captions_time
         self.state_i = 0
         self.transitioning = False # True when inbetween states
         self.start_time = 0
@@ -348,6 +438,8 @@ class Consumer:
             state_time = self.lingering_captions_time
         elif state == WatchState.PRE_CAPTIONS:
             state_time = self.pre_captions_time
+        elif state == WatchState.MANUAL_PAUSED:
+            state_time = 10
         return state_time
 
     def get_state_i_at_time(self, at_time):
@@ -383,11 +475,16 @@ class Consumer:
             action_sequence = change_state(self.state, next_state)
             print(action_sequence)
             self.monitor.stop()
-            print('TEST')
             for action in action_sequence:
                 self.press_pyautogui(action)
             self.state = next_state
             self.monitor.start()
+        time.sleep(0.1)
         self.monitor.stop()
 
+def start_gui():
+    app = QApplication(sys.argv)
+    gui = GUI()
+    gui.show()
+    sys.exit(app.exec())
 
