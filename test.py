@@ -5,7 +5,7 @@ from main import *
 def compare_state_sequence(sequence, iterations, start_breathing, end_breathing, input_sequence = None, should_skip=False):
     # could change to all options allowed to be lists that change over time
     state = WatchState.ESCAPED
-    next_state = WatchState.PLAYING
+    next_state = WatchState.PLAY
     history = [state]
     i = 0
     max_iterations = 50
@@ -29,7 +29,7 @@ class TestWatch:
     def test_next_state_1ff(self):
         sequence = [WatchState.ESCAPED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.ESCAPED]
         compare_state_sequence(sequence, 1, False, False)
@@ -37,11 +37,11 @@ class TestWatch:
     def test_next_state_2ff(self):
         sequence = [WatchState.ESCAPED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.ESCAPED]
         compare_state_sequence(sequence, 2, False, False)
@@ -50,7 +50,7 @@ class TestWatch:
         sequence = [WatchState.ESCAPED,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.ESCAPED]
         compare_state_sequence(sequence, 1, True, False)
@@ -58,7 +58,7 @@ class TestWatch:
     def test_next_state_1ft(self):
         sequence = [WatchState.ESCAPED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.BREATHING,
                     WatchState.ESCAPED]
@@ -68,7 +68,7 @@ class TestWatch:
         sequence = [WatchState.ESCAPED,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.BREATHING,
                     WatchState.ESCAPED]
@@ -79,26 +79,26 @@ class TestWatch:
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.ESCAPED]
         input_sequence = [WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
                           WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
                           WatchInput.NONE,
                           WatchInput.NONE]
@@ -110,8 +110,8 @@ class TestWatch:
                     WatchState.MANUAL_PAUSED,
                     WatchState.ESCAPED]
         input_sequence = [WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
+                          WatchInput.PLAY,
                           WatchInput.NONE]
         compare_state_sequence(sequence, 1, False, False, input_sequence, should_skip=True)
 
@@ -120,26 +120,26 @@ class TestWatch:
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.ESCAPED]
         input_sequence = [WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
                           WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
                           WatchInput.NONE,
                           WatchInput.NONE]
@@ -149,7 +149,7 @@ class TestWatch:
         sequence = [WatchState.ESCAPED,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.ESCAPED]
         input_sequence = [WatchInput.NONE,
                           WatchInput.NONE,
@@ -160,31 +160,25 @@ class TestWatch:
     def test_next_state_manual_play(self):
         sequence = [WatchState.ESCAPED,
                     WatchState.BREATHING,
-                    WatchState.MANUAL_PLAY,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.BREATHING,
-                    WatchState.MANUAL_PLAY,
                     WatchState.LINGERING_CAPTIONS,
-                    WatchState.PLAYING,
+                    WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
                     WatchState.BREATHING,
-                    WatchState.MANUAL_PLAY,
                     WatchState.ESCAPED]
         input_sequence = [WatchInput.NONE,
-                          WatchInput.PLAYING,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
                           WatchInput.NONE,
                           WatchInput.NONE,
-                          WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.NONE,
+                          WatchInput.PLAY,
                           WatchInput.NONE,
                           WatchInput.NONE,
                           WatchInput.NONE,
-                          WatchInput.PLAYING,
-                          WatchInput.NONE,
+                          WatchInput.PLAY,
                           WatchInput.NONE]
         compare_state_sequence(sequence, 2, True, True, input_sequence)
 

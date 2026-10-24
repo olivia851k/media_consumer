@@ -18,8 +18,7 @@ class WatchState(Enum):
     PLAY = 3
     PRE_CAPTIONS = 4
     MANUAL_PAUSED = 5
-    MANUAL_PLAY = 6
-    QUITTING = 7
+    QUITTING = 6
 
 class WatchAction(Enum):
     FOCUS_PLAYER = 0
@@ -85,14 +84,11 @@ def get_next_state(state, iterations, i, watch_input, start_breathing, end_breat
             next_state = WatchState.LINGERING_CAPTIONS
             i += 1
     elif state == WatchState.BREATHING:
-        if watch_input == WatchInput.PLAY:
-            next_state = WatchState.MANUAL_PLAY
+        if i == iterations:
+            next_state = WatchState.ESCAPED
         else:
-            if i == iterations:
-                next_state = WatchState.ESCAPED
-            else:
-                next_state = WatchState.LINGERING_CAPTIONS
-                i += 1
+            next_state = WatchState.LINGERING_CAPTIONS
+            i += 1
     elif state == WatchState.LINGERING_CAPTIONS:
         if watch_input == WatchInput.PLAY:
             next_state = WatchState.MANUAL_PAUSED
@@ -134,17 +130,10 @@ def get_next_state(state, iterations, i, watch_input, start_breathing, end_breat
             next_state = WatchState.MANUAL_PAUSED
         else:
             next_state = WatchState.ESCAPED
-        #manual play, end clause
-    elif state == WatchState.MANUAL_PLAY:
-        if i == iterations:
-            next_state = WatchState.ESCAPED
-        else:
-            next_state = WatchState.LINGERING_CAPTIONS
-            i += 1
     return next_state, i
 
 
-def change_state(state, new_state):
+def change_state(state, new_state, watch_input):
     action_sequence = []
     if state == WatchState.ESCAPED:
         if new_state == WatchState.BREATHING:
@@ -159,9 +148,11 @@ def change_state(state, new_state):
     elif state == WatchState.BREATHING:
         if new_state == WatchState.LINGERING_CAPTIONS:
             action_sequence.append(WatchAction.PLAY)
-        elif new_state == WatchState.MANUAL_PLAY:
-            pass
         elif new_state == WatchState.ESCAPED:
+            if watch_input == WatchInput.PLAY:
+                action_sequence.append(WatchAction.PLAY)
+            elif watch_input == WatchInput.NONE:
+                action_sequence.append(WatchAction.FULLSCREEN)
             action_sequence.append(WatchAction.FOCUS_SELF)
         else:
             invalid_state_transition(state, new_state)
@@ -219,13 +210,6 @@ def change_state(state, new_state):
         elif new_state == WatchState.MANUAL_PAUSED:
             pass
         elif new_state == WatchState.BREATHING:
-            pass
-        else:
-            invalid_state_transition(state, new_state)
-    elif state == WatchState.MANUAL_PLAY:
-        if new_state == WatchState.LINGERING_CAPTIONS:
-            pass
-        elif new_state == WatchState.ESCAPED:
             pass
         else:
             invalid_state_transition(state, new_state)
@@ -464,15 +448,14 @@ class Consumer:
                 break
         return watch_input
     
-    def watch(self):
+    def watch(self, i=0):
         self.state = WatchState.ESCAPED
         self.monitor.start()
-        i = 0
         while self.state != WatchState.ESCAPED or i == 0:
             watch_input = self.sleep_eye_open(self.get_state_time(self.state))
             next_state, i = get_next_state(self.state, self.iterations, i, watch_input, self.start_breathing, self.end_breathing, False)
             print(next_state, i)
-            action_sequence = change_state(self.state, next_state)
+            action_sequence = change_state(self.state, next_state, watch_input)
             print(action_sequence)
             self.monitor.stop()
             for action in action_sequence:
@@ -481,6 +464,7 @@ class Consumer:
             self.monitor.start()
         time.sleep(0.1)
         self.monitor.stop()
+        return i
 
 def start_gui():
     app = QApplication(sys.argv)
