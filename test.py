@@ -4,7 +4,7 @@ from main import *
 
 def compare_state_sequence(sequence, iterations, start_breathing, end_breathing, input_sequence = None, should_skip=False):
     # could change to all options allowed to be lists that change over time
-    state = WatchState.ESCAPED
+    state = WatchState.START
     next_state = WatchState.PLAY
     history = [state]
     i = 0
@@ -27,7 +27,7 @@ def compare_state_sequence(sequence, iterations, start_breathing, end_breathing,
 
 class TestWatch:
     def test_next_state_1ff(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
@@ -35,7 +35,7 @@ class TestWatch:
         compare_state_sequence(sequence, 1, False, False)
 
     def test_next_state_2ff(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
@@ -47,7 +47,7 @@ class TestWatch:
         compare_state_sequence(sequence, 2, False, False)
 
     def test_next_state_1tf(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.PLAY,
@@ -56,7 +56,7 @@ class TestWatch:
         compare_state_sequence(sequence, 1, True, False)
 
     def test_next_state_1ft(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.PLAY,
                     WatchState.PRE_CAPTIONS,
@@ -65,7 +65,7 @@ class TestWatch:
         compare_state_sequence(sequence, 1, False, True)
 
     def test_next_state_1tt(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.PLAY,
@@ -75,7 +75,7 @@ class TestWatch:
         compare_state_sequence(sequence, 1, True, True)
 
     def test_next_state_1pp(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
@@ -105,7 +105,7 @@ class TestWatch:
         compare_state_sequence(sequence, 1, False, False, input_sequence)
 
     def test_next_state_1ps(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.MANUAL_PAUSED,
                     WatchState.ESCAPED]
@@ -116,7 +116,7 @@ class TestWatch:
         compare_state_sequence(sequence, 1, False, False, input_sequence, should_skip=True)
 
     def test_next_state_4ps(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.MANUAL_PAUSED,
                     WatchState.LINGERING_CAPTIONS,
@@ -146,7 +146,7 @@ class TestWatch:
         compare_state_sequence(sequence, 4, False, False, input_sequence, should_skip=True)
 
     def test_next_state_escape(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.PLAY,
@@ -158,7 +158,7 @@ class TestWatch:
         compare_state_sequence(sequence, 1, True, True, input_sequence)
 
     def test_next_state_manual_play(self):
-        sequence = [WatchState.ESCAPED,
+        sequence = [WatchState.START,
                     WatchState.BREATHING,
                     WatchState.LINGERING_CAPTIONS,
                     WatchState.PLAY,
