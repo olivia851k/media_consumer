@@ -3,6 +3,7 @@ import copy
 import pyautogui
 import sys
 from datetime import datetime, timedelta
+from dataclasses import dataclass
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QPushButton, QCheckBox, QLineEdit, QComboBox, QSpinBox,
@@ -220,21 +221,32 @@ def change_state(state, new_state, watch_input):
     return action_sequence
 
 
-def time_spin_box(label, start_min, start_sec, on_changed):
+def time_spin_box(label, on_changed):
     time_layout = QHBoxLayout()
     time_min = QSpinBox()
     time_min.setMaximum(600)
-    time_min.setValue(start_min)
     time_min.valueChanged.connect(on_changed)
     time_sec = QSpinBox()
     time_sec.setMaximum(59)
     time_sec.setSingleStep(5)
-    time_sec.setValue(start_sec)
     time_sec.valueChanged.connect(on_changed)
     time_layout.addWidget(QLabel(label))
     time_layout.addWidget(time_min)
     time_layout.addWidget(time_sec)
     return time_layout, time_min, time_sec
+
+def set_checked(check_box, checked):
+    if checked:
+        check_box.setCheckState(Qt.CheckState.Checked)
+    else:
+        check_box.setCheckState(Qt.CheckState.Unchecked)
+
+def is_checked(check_box):
+    checked_state = check_box.checkState()
+    checked = True
+    if checked_state == Qt.CheckState.Unchecked:
+        checked = False
+    return checked
 
 
 class GUI(QMainWindow):
@@ -264,18 +276,16 @@ class GUI(QMainWindow):
         self.iterations_spin_box = QSpinBox()
         self.iterations_spin_box.setMaximum(600)
         self.iterations_spin_box.setMinimum(1)
-        self.iterations_spin_box.setValue(3)
         self.iterations_spin_box.valueChanged.connect(self.update_stats)
         iterations_layout.addWidget(QLabel('Iterations'))
         iterations_layout.addWidget(self.iterations_spin_box)
 
-        playing_time_layout, self.playing_time_min, self.playing_time_sec = time_spin_box('Playing Time:', 1, 30, self.update_stats)
-        breathing_time_layout, self.breathing_time_min, self.breathing_time_sec = time_spin_box('Breathing Time:', 0, 25, self.update_stats)
+        playing_time_layout, self.playing_time_min, self.playing_time_sec = time_spin_box('Playing Time', self.update_stats)
+        breathing_time_layout, self.breathing_time_min, self.breathing_time_sec = time_spin_box('Breathing Time', self.update_stats)
 
         breathing_layout = QHBoxLayout()
         self.start_breathing_check_box = QCheckBox('Start Breathing')
         self.end_breathing_check_box = QCheckBox('End Breathing')
-        self.end_breathing_check_box.setCheckState(Qt.CheckState.Checked)
         self.start_breathing_check_box.checkStateChanged.connect(self.update_stats)
         self.end_breathing_check_box.checkStateChanged.connect(self.update_stats)
         breathing_layout.addWidget(self.start_breathing_check_box)
@@ -294,6 +304,7 @@ class GUI(QMainWindow):
         self.watch_button = QPushButton('Watch')
         self.watch_button.clicked.connect(self.watch)
 
+        self.load_program(self.program)
         main_layout.addLayout(iterations_layout)
         main_layout.addLayout(playing_time_layout)
         main_layout.addLayout(breathing_time_layout)
@@ -314,22 +325,14 @@ class GUI(QMainWindow):
         return self.breathing_time_min.value() * 60 + self.breathing_time_sec.value()
     @property
     def start_breathing(self):
-        checked_state = self.start_breathing_check_box.checkState()
-        checked = True
-        if checked_state == Qt.CheckState.Unchecked:
-            checked = False
-        return checked
+        return is_checked(self.start_breathing_check_box)
     @property
     def end_breathing(self):
-        checked_state = self.end_breathing_check_box.checkState()
-        checked = True
-        if checked_state == Qt.CheckState.Unchecked:
-            checked = False
-        return checked
+        return is_checked(self.end_breathing_check_box)
 
     def update_stats(self):
         watch_time = self.playing_time * self.iterations
-        watch_time_min = int(watch_time/60)
+        watch_time_min = watch_time//60
         watch_time_sec = watch_time%60
         self.watch_time_label.setText(f'Watch Time  {watch_time_min}m {watch_time_sec}s')
         n_breaths = self.iterations
@@ -338,14 +341,33 @@ class GUI(QMainWindow):
         if not self.end_breathing:
             n_breaths -= 1
         total_time = watch_time + self.breathing_time * n_breaths
-        total_time_min = int(total_time/60)
+        total_time_min = total_time//60
         total_time_sec = total_time%60
         self.total_time_label.setText(f'Total Time  {total_time_min}m {total_time_sec}s')
         end_time = datetime.now() + timedelta(seconds=total_time)
         self.end_time_label.setText(f'End Time  {end_time.hour}:{end_time.minute}')
 
+    def load_program(self, program):
+        self.program = program
+        self.iterations_spin_box.setValue(program.iterations)
+        self.playing_time_min.setValue(program.playing_time//60)
+        self.playing_time_sec.setValue(program.playing_time%60)
+        self.breathing_time_min.setValue(program.breathing_time//60)
+        self.breathing_time_sec.setValue(program.breathing_time%60)
+        set_checked(self.start_breathing_check_box, program.start_breathing)
+        set_checked(self.end_breathing_check_box, program.end_breathing)
+
+    def save_program(self):
+        self.program.iterations = self.iterations_spin_box.value()
+        self.program.playing_time_min = self.playing_time_min.value() * 60
+        self.program.playing_time_sec += self.playing_time_sec.value()
+        self.program.breathing_time_min = self.breathing_time_min.value() * 60
+        self.program.breathing_time_sec += self.breathing_time_sec.value()
+        self.program.start_breathing = is_checked(self.start_breathing_check_box)
+        self.program.end_breathing = is_checked(self.end_breathing_check_box)
+
     def new_consumer(self):
-        self.consumer = Consumer(self.iterations, self.breathing_time, self.playing_time, self.program, self.playing_captions_time, self.lingering_captions, self.pre_captions, self.start_breathing, self.end_breathing, self.captions_count, self.captions_position, self.additional_captions_time)
+        self.consumer = Consumer(self.program)
 
     def watch(self):
         self.new_consumer()
@@ -358,8 +380,25 @@ class GUI(QMainWindow):
         self.update_stats()
 
 
-
+@dataclass
 class Program:
+    name: str
+    play_key: str = 'space'
+    captions_key: str = 'c'
+    fullscreen_key: str = 'f'
+    
+    iterations: int = 3
+    playing_time: int = 90
+    breathing_time: int = 25
+    playing_captions_time: int = 5
+    lingering_captions: bool = False
+    pre_captions: bool = True
+    start_breathing: bool = False
+    end_breathing: bool = True
+    captions_count: int = 1
+    captions_position: int = 1
+    additional_captions_time: float = 0.1
+
     def __init__(self, name):
         self.name = name
         self.captions_key = 'c'
@@ -396,6 +435,16 @@ class Program:
             watch_input = WatchInput.PLAY_AFTER_BREATH
         return watch_input
 
+    def press_pyautogui(self, action):
+        if action == WatchAction.ENABLE_CAPTIONS:
+            for i in range(self.captions_position):
+                self.press(action)
+        elif action == WatchAction.DISABLE_CAPTIONS:
+            for i in range(1+self.captions_count-self.captions_position):
+                self.press(action)
+        else:
+            self.press(action)
+
 
 # interactive style watch :)
 def watch(playing_time, breathing_time, iterations, program_name, captions_count=1, captions_position=1):
@@ -412,59 +461,33 @@ def watch(playing_time, breathing_time, iterations, program_name, captions_count
 
 # the cheeky edge cases are what happens when the user pressed a button during transition
 class Consumer:
-    def __init__(self, iterations, breathing_time, playing_time, program,
-            playing_captions_time, lingering_captions, pre_captions,
-            start_breathing, end_breathing,
-            captions_count, captions_position, additional_captions_time,
-            state_history=None):
+    def __init__(self, program, state_history=None):
 #        self.press_key = press_key
 #        self.watch_wait = watch_wait # returns elapsed_time, keys_pressed
-        self.breathing_time = breathing_time
-        self.playing_time = playing_time
-        self.iterations = iterations
         self.program = program
-        self.start_breathing = start_breathing
-        self.end_breathing = end_breathing
-        self.captions_count = captions_count
-        self.captions_position = captions_position
-        if lingering_captions:
-            self.lingering_captions_time = playing_captions_time
+        if self.program.lingering_captions:
+            self.lingering_captions_time = self.program.playing_captions_time
         else:
-            self.lingering_captions_time = additional_captions_time
-        self.pre_captions_time = self.captions_position * additional_captions_time
-        if pre_captions:
-            self.pre_captions_time += playing_captions_time
+            self.lingering_captions_time = self.program.additional_captions_time
+        self.pre_captions_time = self.program.captions_position * self.program.additional_captions_time
+        if self.program.pre_captions:
+            self.pre_captions_time += self.program.playing_captions_time
         self.state_i = 0
         self.transitioning = False # True when inbetween states
         self.start_time = 0
         self.state = WatchState.START
         self.monitor = Monitor(program)
-        #self.resume_time = resume_time
         if state_history:
             self.state_history = state_history
         else:
             self.state_history = [] # (state, time)
 
-
-    def current_state(self):
-        return self.state_list[self.state_i]
-
-    def press_pyautogui(self, action):
-        if action == WatchAction.ENABLE_CAPTIONS:
-            for i in range(self.captions_position):
-                self.program.press(action)
-        elif action == WatchAction.DISABLE_CAPTIONS:
-            for i in range(1+self.captions_count-self.captions_position):
-                self.program.press(action)
-        else:
-            self.program.press(action)
-
     def get_state_time(self, state):
         state_time = 0
         if state == WatchState.BREATHING:
-            state_time = self.breathing_time
+            state_time = self.program.breathing_time
         elif state == WatchState.PLAY:
-            state_time = self.playing_time - self.lingering_captions_time - self.pre_captions_time
+            state_time = self.program.playing_time - self.lingering_captions_time - self.pre_captions_time
         elif state == WatchState.LINGERING_CAPTIONS:
             state_time = self.lingering_captions_time
         elif state == WatchState.PRE_CAPTIONS:
@@ -472,17 +495,6 @@ class Consumer:
         elif state == WatchState.MANUAL_PAUSED:
             state_time = 10
         return state_time
-
-    def get_state_i_at_time(self, at_time):
-        total_time = 0
-        state_i = 0
-        for state in self.state_list:
-            state_time = get_state_time(self, state)
-            total_time += state_time
-            if at_time <= total_time:
-                break
-            state_i += 1
-        return state_i, total_time - at_time
 
     def sleep_eye_open(self, duration):
         # add back in idle time
@@ -500,13 +512,13 @@ class Consumer:
         self.monitor.start()
         while self.state != WatchState.ESCAPED:
             watch_input = self.sleep_eye_open(self.get_state_time(self.state))
-            next_state, i = get_next_state(self.state, self.iterations, i, watch_input, self.start_breathing, self.end_breathing, False)
+            next_state, i = get_next_state(self.state, self.program.iterations, i, watch_input, self.program.start_breathing, self.program.end_breathing, False)
             print(next_state, i)
             action_sequence = change_state(self.state, next_state, watch_input)
             print(action_sequence)
             self.monitor.stop()
             for action in action_sequence:
-                self.press_pyautogui(action)
+                self.program.press_pyautogui(action)
             self.state = next_state
             self.monitor.start()
         time.sleep(0.1)
