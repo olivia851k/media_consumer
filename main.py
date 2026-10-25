@@ -39,6 +39,11 @@ class WatchInput(Enum):
     PLAY = 3
     PLAY_AFTER_BREATH = 4
 
+class CaptionsOptionsType(Enum):
+    NONE = 0
+    SINGLE = 1
+    MULTIPLE = 2
+
 class Monitor:
     watch_inputs = []
 
@@ -252,14 +257,20 @@ def is_checked(check_box):
 class GUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.lingering_captions = False
-        self.pre_captions = True
-        self.playing_captions_time = 5
-        self.additional_captions_time = 0.1
-        self.captions_count = 1 # also used so captions aren't changed by program
-        self.captions_position = 1
-        self.program = Program('vlc')
-        self.program.captions_key = 'v'
+        program_list = ['vlc', 'youtube', 'natcol']
+        self.programs = {}
+        for program_name in program_list:
+            self.programs[program_name] = Program(program_name)
+        self.program = self.programs['vlc']
+        self.programs['vlc'].captions_key='v'
+        self.programs['vlc'].playing_time=300
+        self.programs['vlc'].iterations=6
+        self.programs['vlc'].start_breathing=True
+        self.programs['natcol'].captions_count = 0
+        self.programs['natcol'].captions_position = 0
+        self.programs['natcol'].playing_time = 80
+        self.programs['natcol'].breathing_time = 20
+        self.programs['natcol'].play_key = 'k'
         self.resume_i = 0
 
         self.init_gui()
@@ -271,6 +282,14 @@ class GUI(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout()
+
+        program_layout = QHBoxLayout()
+        self.program_combo_box = QComboBox()
+        self.program_combo_box.addItems(self.programs.keys())
+        self.program_combo_box.setCurrentIndex(0)
+        self.program_combo_box.currentTextChanged.connect(self.load_program_name)
+        program_layout.addWidget(QLabel('Program'))
+        program_layout.addWidget(self.program_combo_box)
 
         iterations_layout = QHBoxLayout()
         self.iterations_spin_box = QSpinBox()
@@ -305,6 +324,7 @@ class GUI(QMainWindow):
         self.watch_button.clicked.connect(self.watch)
 
         self.load_program(self.program)
+        main_layout.addLayout(program_layout)
         main_layout.addLayout(iterations_layout)
         main_layout.addLayout(playing_time_layout)
         main_layout.addLayout(breathing_time_layout)
@@ -346,6 +366,9 @@ class GUI(QMainWindow):
         self.total_time_label.setText(f'Total Time  {total_time_min}m {total_time_sec}s')
         end_time = datetime.now() + timedelta(seconds=total_time)
         self.end_time_label.setText(f'End Time  {end_time.hour}:{end_time.minute}')
+
+    def load_program_name(self, name):
+        self.load_program(self.programs[name])
 
     def load_program(self, program):
         self.program = program
