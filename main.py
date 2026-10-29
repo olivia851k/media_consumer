@@ -11,33 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from pynput import keyboard
-from enum import Enum
-
-class WatchState(Enum):
-    START = 0
-    ESCAPED = 1
-    BREATHING = 2
-    LINGERING_CAPTIONS = 3
-    PLAY = 4
-    PRE_CAPTIONS = 5
-    MANUAL_PAUSED = 6
-    QUITTING = 7
-
-class WatchAction(Enum):
-    FOCUS_PLAYER = 0
-    FOCUS_SELF = 1
-    PLAY = 2
-    ENABLE_CAPTIONS = 3
-    DISABLE_CAPTIONS = 4
-    FULLSCREEN = 5
-
-class WatchInput(Enum):
-    # in order of importance
-    NONE = 1000 # must be a higher number than the rest
-    FULLSCREEN = 1
-    QUIT = 2
-    PLAY = 3
-    PLAY_AFTER_BREATH = 4
+from watch_state import *
 
 class CaptionsOptionsType(Enum):
     NONE = 0
@@ -382,14 +356,15 @@ class GUI(QMainWindow):
 
     def save_program(self):
         self.program.iterations = self.iterations_spin_box.value()
-        self.program.playing_time_min = self.playing_time_min.value() * 60
-        self.program.playing_time_sec += self.playing_time_sec.value()
-        self.program.breathing_time_min = self.breathing_time_min.value() * 60
-        self.program.breathing_time_sec += self.breathing_time_sec.value()
+        self.program.playing_time = self.playing_time_min.value() * 60
+        self.program.playing_time += self.playing_time_sec.value()
+        self.program.breathing_time = self.breathing_time_min.value() * 60
+        self.program.breathing_time += self.breathing_time_sec.value()
         self.program.start_breathing = is_checked(self.start_breathing_check_box)
         self.program.end_breathing = is_checked(self.end_breathing_check_box)
 
     def new_consumer(self):
+        self.save_program()
         self.consumer = Consumer(self.program)
 
     def watch(self):
