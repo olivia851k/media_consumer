@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QPushButton, QCheckBox, QLineEdit, QComboBox, QSpinBox,
-    QLabel
+    QLabel, QLineEdit
 )
 from PyQt6.QtCore import Qt
 from pynput import keyboard
@@ -50,154 +50,6 @@ def key_to_str(key):
     except AttributeError:
         key_str = str(key)[4:]
     return key_str
-
-def invalid_state_transition(state, new_state):
-    raise Exception(f'Invalid transition from {state.name} to {new_state.name}')
-
-# question as to whether to add in a breathing state after a manual pause if start_breathing == True
-def get_next_state(state, iterations, i, watch_input, start_breathing, end_breathing, should_skip):
-    next_state = WatchState.ESCAPED
-    if watch_input == WatchInput.FULLSCREEN:
-        next_state = WatchState.ESCAPED
-    elif state == WatchState.START:
-        if start_breathing:
-            next_state = WatchState.BREATHING
-        else:
-            next_state = WatchState.LINGERING_CAPTIONS
-            i += 1
-    elif state == WatchState.BREATHING:
-        if i == iterations:
-            next_state = WatchState.ESCAPED
-        else:
-            next_state = WatchState.LINGERING_CAPTIONS
-            i += 1
-    elif state == WatchState.LINGERING_CAPTIONS:
-        if watch_input == WatchInput.PLAY:
-            next_state = WatchState.MANUAL_PAUSED
-        else:
-            next_state = WatchState.PLAY
-    elif state == WatchState.PLAY:
-        if watch_input == WatchInput.PLAY:
-            next_state = WatchState.MANUAL_PAUSED
-        else:
-            next_state = WatchState.PRE_CAPTIONS
-    elif state == WatchState.PRE_CAPTIONS:
-        if watch_input == WatchInput.PLAY:
-            next_state = WatchState.MANUAL_PAUSED
-        else:
-            if i == iterations:
-                if end_breathing:
-                    next_state = WatchState.BREATHING
-                else:
-                    next_state = WatchState.ESCAPED
-            else:
-                next_state = WatchState.BREATHING
-    elif state == WatchState.MANUAL_PAUSED:
-        # might skip an iteration depending on the timestamp of the last lingering captions
-        if watch_input == WatchInput.PLAY:
-            if i == iterations and should_skip:
-                if end_breathing:
-                    next_state = WatchState.BREATHING
-                else:
-                    next_state = WatchState.ESCAPED
-            else:
-                if should_skip:
-                    i += 1
-                next_state = WatchState.LINGERING_CAPTIONS
-        elif watch_input == WatchInput.PLAY_AFTER_BREATH:
-            next_state = WatchState.BREATHING
-            if should_skip:
-                i += 1
-        elif watch_input == WatchInput.NONE:
-            next_state = WatchState.MANUAL_PAUSED
-        else:
-            next_state = WatchState.ESCAPED
-    return next_state, i
-
-
-def change_state(state, new_state, watch_input):
-    action_sequence = []
-    if state == WatchState.START:
-        if new_state == WatchState.BREATHING:
-            action_sequence.extend([WatchAction.FOCUS_PLAYER,
-                                    WatchAction.FULLSCREEN])
-        elif new_state == WatchState.LINGERING_CAPTIONS:
-            action_sequence.extend([WatchAction.FOCUS_PLAYER,
-                                    WatchAction.FULLSCREEN,
-                                    WatchAction.PLAY])
-        else:
-            invalid_state_transition(state, new_state)
-    elif state == WatchState.BREATHING:
-        if new_state == WatchState.LINGERING_CAPTIONS:
-            action_sequence.append(WatchAction.PLAY)
-        elif new_state == WatchState.ESCAPED:
-            if watch_input == WatchInput.PLAY:
-                action_sequence.append(WatchAction.PLAY)
-            elif watch_input == WatchInput.NONE:
-                action_sequence.append(WatchAction.FULLSCREEN)
-            action_sequence.append(WatchAction.FOCUS_SELF)
-        else:
-            invalid_state_transition(state, new_state)
-    elif state == WatchState.LINGERING_CAPTIONS:
-        if new_state == WatchState.PLAY:
-            action_sequence.append(WatchAction.DISABLE_CAPTIONS)
-        elif new_state == WatchState.MANUAL_PAUSED:
-            pass
-        elif new_state == WatchState.ESCAPED:
-            action_sequence.extend([WatchAction.PLAY,
-                                    WatchAction.FOCUS_SELF])
-        elif new_state == WatchState.QUITTING:
-            action_sequence.extend([WatchAction.FULLSCREEN,
-                                    WatchAction.FOCUS_SELF])
-        else:
-            invalid_state_transition(state, new_state)
-    elif state == WatchState.PLAY:
-        if new_state == WatchState.PRE_CAPTIONS:
-            action_sequence.append(WatchAction.ENABLE_CAPTIONS)
-        elif new_state == WatchState.MANUAL_PAUSED:
-            action_sequence.append(WatchAction.ENABLE_CAPTIONS)
-        elif new_state == WatchState.ESCAPED:
-            action_sequence.extend([WatchAction.PLAY,
-                                    WatchAction.ENABLE_CAPTIONS,
-                                    WatchAction.FOCUS_SELF])
-        elif new_state == WatchState.QUITTING:
-            action_sequence.extend([WatchAction.FULLSCREEN,
-                                    WatchAction.ENABLE_CAPTIONS,
-                                    WatchAction.FOCUS_SELF])
-        else:
-            invalid_state_transition(state, new_state)
-    elif state == WatchState.PRE_CAPTIONS:
-        if new_state == WatchState.BREATHING:
-            action_sequence.append(WatchAction.PLAY)
-        elif new_state == WatchState.MANUAL_PAUSED:
-            pass
-        elif new_state == WatchState.ESCAPED:
-            if watch_input != WatchInput.FULLSCREEN:
-                action_sequence.append(WatchAction.FULLSCREEN)
-            action_sequence.extend([WatchAction.PLAY,
-                                    WatchAction.FOCUS_SELF])
-        elif new_state == WatchState.QUITTING:
-            action_sequence.extend([WatchAction.FULLSCREEN,
-                                    WatchAction.FOCUS_SELF])
-        else:
-            invalid_state_transition(state, new_state)
-    elif state == WatchState.MANUAL_PAUSED:
-        if new_state == WatchState.LINGERING_CAPTIONS:
-            pass
-        elif new_state == WatchState.PLAY:
-            action_sequence.append(WatchAction.DISABLE_CAPTIONS)
-        elif new_state == WatchState.PRE_CAPTIONS:
-            pass
-        elif new_state == WatchState.ESCAPED:
-            action_sequence.append(WatchAction.FOCUS_SELF)
-            pass
-        elif new_state == WatchState.MANUAL_PAUSED:
-            pass
-        elif new_state == WatchState.BREATHING:
-            pass
-        else:
-            invalid_state_transition(state, new_state)
-    return action_sequence
 
 
 def time_spin_box(label, on_changed):
@@ -251,16 +103,21 @@ class GUI(QMainWindow):
 
     def init_gui(self):
         self.setWindowTitle('Media Consumer')
-        self.setGeometry(100, 100, 600, 400)
+        self.setGeometry(2000, 200, 400, 600)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout()
+        tabs = QTabWidget()
+        watch_tab_tab = QWidget()
+        profile_tab_tab = QWidget()
+        watch_tab = QVBoxLayout()
+        profile_tab = QVBoxLayout()
 
         program_layout = QHBoxLayout()
         self.program_combo_box = QComboBox()
-        self.program_combo_box.addItems(self.programs.keys())
-        self.program_combo_box.setCurrentIndex(0)
+        self.program_combo_box.addItems(self.program_names())
+        self.program_combo_box.setCurrentIndex(self.program_names().index(self.program.name))
         self.program_combo_box.currentTextChanged.connect(self.load_program_name)
         program_layout.addWidget(QLabel('Program'))
         program_layout.addWidget(self.program_combo_box)
@@ -297,14 +154,45 @@ class GUI(QMainWindow):
         self.watch_button = QPushButton('Watch')
         self.watch_button.clicked.connect(self.watch)
 
+        watch_tab.addLayout(iterations_layout)
+        watch_tab.addLayout(playing_time_layout)
+        watch_tab.addLayout(breathing_time_layout)
+        watch_tab.addLayout(breathing_layout)
+        watch_tab.addLayout(time_stats_layout)
+        watch_tab.addWidget(self.watch_button)
+
+
+        name_layout = QHBoxLayout()
+        self.name_line_edit = QLineEdit()
+        self.name_line_edit.editingFinished.connect(self.update_programs)
+        name_layout.addWidget(QLabel('Name'))
+        name_layout.addWidget(self.name_line_edit)
+
+        captions_time_layout = QHBoxLayout()
+        self.captions_time_spin_box = QSpinBox()
+        self.captions_time_spin_box.setMaximum(600)
+        captions_time_layout.addWidget(QLabel('Show captions while playing for'))
+        captions_time_layout.addWidget(self.captions_time_spin_box)
+        captions_time_layout.addWidget(QLabel('seconds'))
+        self.lingering_captions_check_box = QCheckBox()
+        self.pre_captions_check_box = QCheckBox()
+        captions_ling_pre_layout = QHBoxLayout()
+        captions_ling_pre_layout.addWidget(QLabel('Show before breath'))
+        captions_ling_pre_layout.addWidget(self.pre_captions_check_box)
+        captions_ling_pre_layout.addWidget(QLabel('Linger after breath'))
+        captions_ling_pre_layout.addWidget(self.lingering_captions_check_box)
+
+        profile_tab.addLayout(name_layout)
+        profile_tab.addLayout(captions_time_layout)
+        profile_tab.addLayout(captions_ling_pre_layout)
+
         self.load_program(self.program)
+        watch_tab_tab.setLayout(watch_tab)
+        profile_tab_tab.setLayout(profile_tab)
+        tabs.addTab(watch_tab_tab, 'Watch')
+        tabs.addTab(profile_tab_tab, 'Profile')
         main_layout.addLayout(program_layout)
-        main_layout.addLayout(iterations_layout)
-        main_layout.addLayout(playing_time_layout)
-        main_layout.addLayout(breathing_time_layout)
-        main_layout.addLayout(breathing_layout)
-        main_layout.addLayout(time_stats_layout)
-        main_layout.addWidget(self.watch_button)
+        main_layout.addWidget(tabs)
 
         central_widget.setLayout(main_layout)
 
@@ -341,7 +229,21 @@ class GUI(QMainWindow):
         end_time = datetime.now() + timedelta(seconds=total_time)
         self.end_time_label.setText(f'End Time  {end_time.hour}:{end_time.minute}')
 
+    def program_names(self):
+        names = list(self.programs.keys())
+        names.sort()
+        return names
+
+    def update_programs(self):
+        self.program_combo_box.currentTextChanged.disconnect()
+        self.program_combo_box.clear()
+        self.save_program()
+        self.program_combo_box.addItems(self.program_names())
+        self.program_combo_box.setCurrentIndex(self.program_names().index(self.program.name))
+        self.program_combo_box.currentTextChanged.connect(self.load_program_name)
+
     def load_program_name(self, name):
+        self.save_program()
         self.load_program(self.programs[name])
 
     def load_program(self, program):
@@ -354,14 +256,26 @@ class GUI(QMainWindow):
         set_checked(self.start_breathing_check_box, program.start_breathing)
         set_checked(self.end_breathing_check_box, program.end_breathing)
 
+        self.name_line_edit.setText(program.name)
+        self.captions_time_spin_box.setValue(program.playing_captions_time)
+        set_checked(self.lingering_captions_check_box, program.lingering_captions)
+        set_checked(self.pre_captions_check_box, program.pre_captions)
+
     def save_program(self):
-        self.program.iterations = self.iterations_spin_box.value()
-        self.program.playing_time = self.playing_time_min.value() * 60
-        self.program.playing_time += self.playing_time_sec.value()
-        self.program.breathing_time = self.breathing_time_min.value() * 60
-        self.program.breathing_time += self.breathing_time_sec.value()
-        self.program.start_breathing = is_checked(self.start_breathing_check_box)
-        self.program.end_breathing = is_checked(self.end_breathing_check_box)
+        self.program.iterations = self.iterations
+        self.program.playing_time = self.playing_time
+        self.program.breathing_time = self.breathing_time
+        self.program.start_breathing = self.start_breathing
+        self.program.end_breathing = self.end_breathing
+
+        old_name = self.program.name
+        self.program.name = self.name_line_edit.text()
+        if old_name != self.program.name:
+            self.programs[self.program.name] = self.program
+            self.programs.pop(old_name)
+        self.program.playing_captions_time = self.captions_time_spin_box.value()
+        self.program.lingering_captions = is_checked(self.lingering_captions_check_box)
+        self.program.pre_captions = is_checked(self.pre_captions_check_box)
 
     def new_consumer(self):
         self.save_program()
