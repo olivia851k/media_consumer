@@ -182,4 +182,14 @@ class TestWatch:
                           WatchInput.NONE]
         compare_state_sequence(sequence, 2, True, True, input_sequence)
 
+#   def test_change_state_no_manage_captions(self):
+#       for state in WatchState:
+#           for new_state in WatchState:
+#               for watch_input in WatchInput:
+#                   try:
+#                       actions change_state(state, new_state, watch_input)
+#                       assert
+#                   except:
+#                       pass
+
 

@@ -151,6 +151,21 @@ class GUI(QMainWindow):
         time_stats_layout.addWidget(self.total_time_label)
         time_stats_layout.addWidget(self.end_time_label)
 
+        captions_layout = QHBoxLayout()
+        self.manage_captions_check_box = QCheckBox()
+        self.manage_captions_check_box.checkStateChanged.connect(self.update_manage_captions)
+        self.captions_count_spin_box = QSpinBox()
+        self.captions_count_spin_box.setMaximum(99)
+        self.captions_count_spin_box.valueChanged.connect(self.update_captions_count)
+        self.captions_position_spin_box = QSpinBox()
+        self.captions_position_spin_box.setMaximum(99)
+        captions_layout.addWidget(QLabel('Manage captions'))
+        captions_layout.addWidget(self.manage_captions_check_box)
+        captions_layout.addWidget(QLabel('Count'))
+        captions_layout.addWidget(self.captions_count_spin_box)
+        captions_layout.addWidget(QLabel('Position'))
+        captions_layout.addWidget(self.captions_position_spin_box)
+
         self.watch_button = QPushButton('Watch')
         self.watch_button.clicked.connect(self.watch)
 
@@ -159,6 +174,7 @@ class GUI(QMainWindow):
         watch_tab.addLayout(breathing_time_layout)
         watch_tab.addLayout(breathing_layout)
         watch_tab.addLayout(time_stats_layout)
+        watch_tab.addLayout(captions_layout)
         watch_tab.addWidget(self.watch_button)
 
 
@@ -242,6 +258,19 @@ class GUI(QMainWindow):
         self.program_combo_box.setCurrentIndex(self.program_names().index(self.program.name))
         self.program_combo_box.currentTextChanged.connect(self.load_program_name)
 
+    def update_manage_captions(self):
+        manage = is_checked(self.manage_captions_check_box)
+        if not manage:
+            self.captions_count_spin_box.setValue(0)
+            self.captions_position_spin_box.setMaximum(0)
+
+    def update_captions_count(self):
+        if self.captions_count_spin_box.value() > 0:
+            self.captions_position_spin_box.setMaximum(self.captions_count_spin_box.value())
+            set_checked(self.manage_captions_check_box, True)
+        else:
+            set_checked(self.manage_captions_check_box, False)
+
     def load_program_name(self, name):
         self.save_program()
         self.load_program(self.programs[name])
@@ -255,6 +284,8 @@ class GUI(QMainWindow):
         self.breathing_time_sec.setValue(program.breathing_time%60)
         set_checked(self.start_breathing_check_box, program.start_breathing)
         set_checked(self.end_breathing_check_box, program.end_breathing)
+        self.captions_count_spin_box.setValue(program.captions_count)
+        self.captions_position_spin_box.setValue(program.captions_position)
 
         self.name_line_edit.setText(program.name)
         self.captions_time_spin_box.setValue(program.playing_captions_time)
@@ -267,6 +298,8 @@ class GUI(QMainWindow):
         self.program.breathing_time = self.breathing_time
         self.program.start_breathing = self.start_breathing
         self.program.end_breathing = self.end_breathing
+        self.program.captions_count = self.captions_count_spin_box.value()
+        self.program.captions_position = self.captions_position_spin_box.value()
 
         old_name = self.program.name
         self.program.name = self.name_line_edit.text()
@@ -352,8 +385,9 @@ class Program:
             for i in range(self.captions_position):
                 self.press(action)
         elif action == WatchAction.DISABLE_CAPTIONS:
-            for i in range(1+self.captions_count-self.captions_position):
-                self.press(action)
+            if self.captions_count > 0:
+                for i in range(1+self.captions_count-self.captions_position):
+                    self.press(action)
         else:
             self.press(action)
 
