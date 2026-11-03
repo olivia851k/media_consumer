@@ -11,12 +11,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from pynput import keyboard
+from functools import partial
 from watch_state import *
-
-class CaptionsOptionsType(Enum):
-    NONE = 0
-    SINGLE = 1
-    MULTIPLE = 2
 
 class Monitor:
     watch_inputs = []
@@ -184,6 +180,28 @@ class GUI(QMainWindow):
         name_layout.addWidget(QLabel('Name'))
         name_layout.addWidget(self.name_line_edit)
 
+        fullscreen_key_layout = QHBoxLayout()
+        self.fullscreen_key_line_edit = QLineEdit()
+        self.fullscreen_key_line_edit.editingFinished.connect(self.update_fullscreen_key)
+        self.fullscreen_key_valid_label = QLabel('valid')
+        fullscreen_key_layout.addWidget(QLabel('Fullscreen key:'))
+        fullscreen_key_layout.addWidget(self.fullscreen_key_line_edit)
+        fullscreen_key_layout.addWidget(self.fullscreen_key_valid_label)
+        play_key_layout = QHBoxLayout()
+        self.play_key_line_edit = QLineEdit()
+        self.play_key_line_edit.editingFinished.connect(self.update_play_key)
+        self.play_key_valid_label = QLabel('valid')
+        play_key_layout.addWidget(QLabel('Play key:'))
+        play_key_layout.addWidget(self.play_key_line_edit)
+        play_key_layout.addWidget(self.play_key_valid_label)
+        captions_key_layout = QHBoxLayout()
+        self.captions_key_line_edit = QLineEdit()
+        self.captions_key_line_edit.editingFinished.connect(self.update_captions_key)
+        self.captions_key_valid_label = QLabel('valid')
+        captions_key_layout.addWidget(QLabel('Captions key:'))
+        captions_key_layout.addWidget(self.captions_key_line_edit)
+        captions_key_layout.addWidget(self.captions_key_valid_label)
+
         captions_time_layout = QHBoxLayout()
         self.captions_time_spin_box = QSpinBox()
         self.captions_time_spin_box.setMaximum(600)
@@ -199,6 +217,9 @@ class GUI(QMainWindow):
         captions_ling_pre_layout.addWidget(self.lingering_captions_check_box)
 
         profile_tab.addLayout(name_layout)
+        profile_tab.addLayout(fullscreen_key_layout)
+        profile_tab.addLayout(play_key_layout)
+        profile_tab.addLayout(captions_key_layout)
         profile_tab.addLayout(captions_time_layout)
         profile_tab.addLayout(captions_ling_pre_layout)
 
@@ -271,6 +292,22 @@ class GUI(QMainWindow):
         else:
             set_checked(self.manage_captions_check_box, False)
 
+    def update_fullscreen_key(self):
+        if self.fullscreen_key_line_edit.text() in pyautogui.KEYBOARD_KEYS:
+            self.fullscreen_key_valid_label.setText('valid')
+        else:
+            self.fullscreen_key_valid_label.setText('invalid')
+    def update_play_key(self):
+        if self.play_key_line_edit.text() in pyautogui.KEYBOARD_KEYS:
+            self.play_key_valid_label.setText('valid')
+        else:
+            self.play_key_valid_label.setText('invalid')
+    def update_captions_key(self):
+        if self.captions_key_line_edit.text() in pyautogui.KEYBOARD_KEYS:
+            self.captions_key_valid_label.setText('valid')
+        else:
+            self.captions_key_valid_label.setText('invalid')
+
     def load_program_name(self, name):
         self.save_program()
         self.load_program(self.programs[name])
@@ -288,6 +325,9 @@ class GUI(QMainWindow):
         self.captions_position_spin_box.setValue(program.captions_position)
 
         self.name_line_edit.setText(program.name)
+        self.fullscreen_key_line_edit.setText(program.fullscreen_key)
+        self.play_key_line_edit.setText(program.play_key)
+        self.captions_key_line_edit.setText(program.captions_key)
         self.captions_time_spin_box.setValue(program.playing_captions_time)
         set_checked(self.lingering_captions_check_box, program.lingering_captions)
         set_checked(self.pre_captions_check_box, program.pre_captions)
@@ -306,6 +346,12 @@ class GUI(QMainWindow):
         if old_name != self.program.name:
             self.programs[self.program.name] = self.program
             self.programs.pop(old_name)
+        if self.fullscreen_key_line_edit.text() in pyautogui.KEYBOARD_KEYS:
+            self.program.fullscreen_key = self.fullscreen_key_line_edit.text()
+        if self.play_key_line_edit.text() in pyautogui.KEYBOARD_KEYS:
+            self.program.play_key = self.play_key_line_edit.text()
+        if self.captions_key_line_edit.text() in pyautogui.KEYBOARD_KEYS:
+            self.program.captions_key = self.captions_key_line_edit.text()
         self.program.playing_captions_time = self.captions_time_spin_box.value()
         self.program.lingering_captions = is_checked(self.lingering_captions_check_box)
         self.program.pre_captions = is_checked(self.pre_captions_check_box)
@@ -360,12 +406,12 @@ class Program:
         elif action == WatchAction.FOCUS_SELF:
             time.sleep(0.6)
             pyautogui.hotkey('alt', 'tab')
-        elif action == WatchAction.PLAY:
-            time.sleep(0.1)
-            pyautogui.press(self.play_key)
         elif action == WatchAction.FULLSCREEN:
             time.sleep(0.3)
             pyautogui.press(self.fullscreen_key)
+        elif action == WatchAction.PLAY:
+            time.sleep(0.1)
+            pyautogui.press(self.play_key)
 
     def key_to_input(self, key):
         key = key_to_str(key)

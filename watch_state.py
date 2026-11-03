@@ -27,6 +27,11 @@ class WatchInput(Enum):
     PLAY = 3
     PLAY_AFTER_BREATH = 4
 
+class CaptionsOptionsType(Enum):
+    NONE = 0
+    SINGLE = 1
+    MULTIPLE = 2
+
 
 def invalid_state_transition(state, new_state):
     raise Exception(f'Invalid transition from {state.name} to {new_state.name}')
