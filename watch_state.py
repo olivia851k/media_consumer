@@ -18,6 +18,7 @@ class WatchAction(Enum):
     ENABLE_CAPTIONS = 3
     DISABLE_CAPTIONS = 4
     FULLSCREEN = 5
+    KEEP_AWAKE = 6
 
 class WatchInput(Enum):
     # in order of importance
