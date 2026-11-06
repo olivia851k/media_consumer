@@ -118,26 +118,9 @@ class GUI(QMainWindow):
 
         self.init_gui()
 
-    def init_gui(self):
-        self.setWindowTitle('Media Consumer')
-        self.setGeometry(2000, 200, 400, 600)
-
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout()
-        tabs = QTabWidget()
-        watch_tab_tab = QWidget()
-        profile_tab_tab = QWidget()
-        watch_tab = QVBoxLayout()
-        profile_tab = QVBoxLayout()
-
-        program_layout = QHBoxLayout()
-        self.program_combo_box = QComboBox()
-        self.program_combo_box.addItems(self.program_names())
-        self.program_combo_box.setCurrentIndex(self.program_names().index(self.program.name))
-        self.program_combo_box.currentTextChanged.connect(self.load_program_name)
-        program_layout.addWidget(QLabel('Program'))
-        program_layout.addWidget(self.program_combo_box)
+    def init_watch_tab(self):
+        tab_widget = QWidget()
+        tab = QVBoxLayout()
 
         iterations_layout = QHBoxLayout()
         self.iterations_spin_box = QSpinBox()
@@ -186,20 +169,29 @@ class GUI(QMainWindow):
         self.watch_button = QPushButton('Watch')
         self.watch_button.clicked.connect(self.watch)
 
-        watch_tab.addLayout(iterations_layout)
-        watch_tab.addLayout(playing_time_layout)
-        watch_tab.addLayout(breathing_time_layout)
-        watch_tab.addLayout(breathing_layout)
-        watch_tab.addLayout(time_stats_layout)
-        watch_tab.addLayout(captions_layout)
-        watch_tab.addWidget(self.watch_button)
+        tab.addLayout(iterations_layout)
+        tab.addLayout(playing_time_layout)
+        tab.addLayout(breathing_time_layout)
+        tab.addLayout(breathing_layout)
+        tab.addLayout(time_stats_layout)
+        tab.addLayout(captions_layout)
+        tab.addWidget(self.watch_button)
 
+        tab_widget.setLayout(tab)
+        return tab_widget
+
+    def init_profile_tab(self):
+        tab_widget = QWidget()
+        tab = QVBoxLayout()
 
         name_layout = QHBoxLayout()
         self.name_line_edit = QLineEdit()
         self.name_line_edit.editingFinished.connect(self.update_programs)
+        self.new_program_button = QPushButton('New clone')
+        self.new_program_button.clicked.connect(self.new_program)
         name_layout.addWidget(QLabel('Name'))
         name_layout.addWidget(self.name_line_edit)
+        name_layout.addWidget(self.new_program_button)
 
         key_widgets = init_key_option('Fullscreen')
         fullscreen_key_layout, self.fullscreen_key_line_edit, self.fullscreen_key_valid_label = key_widgets
@@ -224,23 +216,40 @@ class GUI(QMainWindow):
         captions_ling_pre_layout.addWidget(QLabel('Linger after breath'))
         captions_ling_pre_layout.addWidget(self.lingering_captions_check_box)
 
-        self.new_profile_button = QPushButton('New')
-        self.new_profile_button.clicked.connect(self.new_program)
+        tab.addLayout(name_layout)
+        tab.addLayout(fullscreen_key_layout)
+        tab.addLayout(play_key_layout)
+        tab.addLayout(captions_key_layout)
+        tab.addLayout(keep_awake_key_layout)
+        tab.addLayout(captions_time_layout)
+        tab.addLayout(captions_ling_pre_layout)
 
-        profile_tab.addLayout(name_layout)
-        profile_tab.addLayout(fullscreen_key_layout)
-        profile_tab.addLayout(play_key_layout)
-        profile_tab.addLayout(captions_key_layout)
-        profile_tab.addLayout(keep_awake_key_layout)
-        profile_tab.addLayout(captions_time_layout)
-        profile_tab.addLayout(captions_ling_pre_layout)
-        profile_tab.addWidget(self.new_profile_button)
+        tab_widget.setLayout(tab)
+        return tab_widget 
+
+    def init_gui(self):
+        self.setWindowTitle('Media Consumer')
+        self.setGeometry(2000, 200, 400, 600)
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout()
+        tabs = QTabWidget()
+
+        program_layout = QHBoxLayout()
+        self.program_combo_box = QComboBox()
+        self.program_combo_box.addItems(self.program_names())
+        self.program_combo_box.setCurrentIndex(self.program_names().index(self.program.name))
+        self.program_combo_box.currentTextChanged.connect(self.load_program_name)
+        program_layout.addWidget(QLabel('Program'))
+        program_layout.addWidget(self.program_combo_box)
+
+        watch_tab = self.init_watch_tab()
+        profile_tab = self.init_profile_tab()
 
         self.load_program(self.program)
-        watch_tab_tab.setLayout(watch_tab)
-        profile_tab_tab.setLayout(profile_tab)
-        tabs.addTab(watch_tab_tab, 'Watch')
-        tabs.addTab(profile_tab_tab, 'Profile')
+        tabs.addTab(watch_tab, 'Watch')
+        tabs.addTab(profile_tab, 'Profile')
         main_layout.addLayout(program_layout)
         main_layout.addWidget(tabs)
 
