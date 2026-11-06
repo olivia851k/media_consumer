@@ -10,14 +10,14 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QShortcut, QKeySequence
 from pynput import keyboard
 from functools import partial
 from watch_state import *
 
 class Monitor:
-    watch_inputs = []
-
     def __init__(self, program):
+        self.watch_inputs = []
         self.program = program
 
     def on_press(self, key):
@@ -224,6 +224,9 @@ class GUI(QMainWindow):
         captions_ling_pre_layout.addWidget(QLabel('Linger after breath'))
         captions_ling_pre_layout.addWidget(self.lingering_captions_check_box)
 
+        self.new_profile_button = QPushButton('New')
+        self.new_profile_button.clicked.connect(self.new_program)
+
         profile_tab.addLayout(name_layout)
         profile_tab.addLayout(fullscreen_key_layout)
         profile_tab.addLayout(play_key_layout)
@@ -231,6 +234,7 @@ class GUI(QMainWindow):
         profile_tab.addLayout(keep_awake_key_layout)
         profile_tab.addLayout(captions_time_layout)
         profile_tab.addLayout(captions_ling_pre_layout)
+        profile_tab.addWidget(self.new_profile_button)
 
         self.load_program(self.program)
         watch_tab_tab.setLayout(watch_tab)
@@ -241,6 +245,9 @@ class GUI(QMainWindow):
         main_layout.addWidget(tabs)
 
         central_widget.setLayout(main_layout)
+
+        self.watch_shortcut = QShortcut(QKeySequence("Ctrl+Space"), self)
+        self.watch_shortcut.activated.connect(self.pause_then_watch)
 
     @property
     def iterations(self):
@@ -257,6 +264,7 @@ class GUI(QMainWindow):
     @property
     def end_breathing(self):
         return is_checked(self.end_breathing_check_box)
+
 
     def update_stats(self):
         watch_time = self.playing_time * self.iterations
@@ -290,7 +298,10 @@ class GUI(QMainWindow):
 
     def update_manage_captions(self):
         manage = is_checked(self.manage_captions_check_box)
-        if not manage:
+        if manage:
+            self.captions_count_spin_box.setValue(1)
+            self.captions_position_spin_box.setValue(1)
+        else:
             self.captions_count_spin_box.setValue(0)
             self.captions_position_spin_box.setMaximum(0)
 
@@ -300,6 +311,15 @@ class GUI(QMainWindow):
             set_checked(self.manage_captions_check_box, True)
         else:
             set_checked(self.manage_captions_check_box, False)
+
+    def new_program(self):
+        self.save_program()
+        clone = copy.deepcopy(self.program)
+        clone.name = f'{self.program.name} - clone'
+        self.name_line_edit.setText(clone.name)
+        self.program = clone
+        self.programs[clone.name] = clone
+        self.update_programs()
 
     def load_program_name(self, name):
         self.save_program()
@@ -361,6 +381,10 @@ class GUI(QMainWindow):
         self.new_consumer()
         self.consumer.watch(i = self.resume_i)
         self.update_stats()
+
+    def pause_then_watch(self):
+        time.sleep(0.5)
+        self.watch()
 
 
 @dataclass
