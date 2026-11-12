@@ -29,9 +29,9 @@ class WatchInput(Enum):
     PLAY_AFTER_BREATH = 4
 
 class CaptionsOptionsType(Enum):
-    NONE = 0
-    SINGLE = 1
-    MULTIPLE = 2
+    Disable = 0
+    Single = 1
+    Multiple = 2
 
 
 def invalid_state_transition(state, new_state):

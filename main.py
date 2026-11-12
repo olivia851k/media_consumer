@@ -80,6 +80,8 @@ def init_key_option(key_name):
     key_line_edit = QLineEdit()
     key_valid_label = QLabel('valid')
     key_line_edit.editingFinished.connect(partial(update_key, key_line_edit, key_valid_label))
+    key_valid_label.setToolTip(f'Valid keys: {pyautogui.KEYBOARD_KEYS}')
+    key_line_edit.setToolTip(f'Valid keys: {pyautogui.KEYBOARD_KEYS}')
     key_layout.addWidget(QLabel(f'{key_name} key:'))
     key_layout.addWidget(key_line_edit)
     key_layout.addWidget(key_valid_label)
@@ -109,6 +111,7 @@ class GUI(QMainWindow):
         self.programs['vlc'].playing_time=300
         self.programs['vlc'].iterations=6
         self.programs['vlc'].start_breathing=True
+        self.programs['vlc'].captions_options_type = CaptionsOptionsType.Multiple
         self.programs['natcol'].captions_count = 0
         self.programs['natcol'].captions_position = 0
         self.programs['natcol'].playing_time = 80
@@ -138,6 +141,8 @@ class GUI(QMainWindow):
         self.end_breathing_check_box = QCheckBox('End Breathing')
         self.start_breathing_check_box.checkStateChanged.connect(self.update_stats)
         self.end_breathing_check_box.checkStateChanged.connect(self.update_stats)
+        self.start_breathing_check_box.setToolTip('Add a pause at the start of playback')
+        self.end_breathing_check_box.setToolTip('Add a pause at the end of playback')
         breathing_layout.addWidget(self.start_breathing_check_box)
         breathing_layout.addWidget(self.end_breathing_check_box)
 
@@ -152,18 +157,21 @@ class GUI(QMainWindow):
         time_stats_layout.addWidget(self.end_time_label)
 
         captions_layout = QHBoxLayout()
+        self.manage_captions_label = QLabel('Manage captions')
         self.manage_captions_check_box = QCheckBox()
         self.manage_captions_check_box.checkStateChanged.connect(self.update_manage_captions)
+        self.captions_count_label = QLabel('Count')
         self.captions_count_spin_box = QSpinBox()
         self.captions_count_spin_box.setMaximum(99)
         self.captions_count_spin_box.valueChanged.connect(self.update_captions_count)
+        self.captions_position_label = QLabel('Position')
         self.captions_position_spin_box = QSpinBox()
         self.captions_position_spin_box.setMaximum(99)
-        captions_layout.addWidget(QLabel('Manage captions'))
+        captions_layout.addWidget(self.manage_captions_label)
         captions_layout.addWidget(self.manage_captions_check_box)
-        captions_layout.addWidget(QLabel('Count'))
+        captions_layout.addWidget(self.captions_count_label)
         captions_layout.addWidget(self.captions_count_spin_box)
-        captions_layout.addWidget(QLabel('Position'))
+        captions_layout.addWidget(self.captions_position_label)
         captions_layout.addWidget(self.captions_position_spin_box)
 
         self.watch_button = QPushButton('Watch')
@@ -202,6 +210,16 @@ class GUI(QMainWindow):
         key_widgets = init_key_option('Keep awake')
         keep_awake_key_layout, self.keep_awake_key_line_edit, self.keep_awake_key_valid_label = key_widgets
 
+        captions_options_type_layout = QHBoxLayout()
+        self.captions_options_type_combo_box = QComboBox()
+        captions_options_types = []
+        for enum in list(CaptionsOptionsType):
+            captions_options_types.append(enum.name)
+        self.captions_options_type_combo_box.addItems(captions_options_types)
+        self.captions_options_type_combo_box.currentIndexChanged.connect(self.update_captions_options_type)
+        captions_options_type_layout.addWidget(QLabel('Captions options'))
+        captions_options_type_layout.addWidget(self.captions_options_type_combo_box)
+
         captions_time_layout = QHBoxLayout()
         self.captions_time_spin_box = QSpinBox()
         self.captions_time_spin_box.setMaximum(600)
@@ -222,6 +240,7 @@ class GUI(QMainWindow):
         tab.addLayout(captions_key_layout)
         tab.addLayout(keep_awake_key_layout)
         tab.addLayout(captions_time_layout)
+        tab.addLayout(captions_options_type_layout)
         tab.addLayout(captions_ling_pre_layout)
 
         tab_widget.setLayout(tab)
@@ -321,6 +340,33 @@ class GUI(QMainWindow):
         else:
             set_checked(self.manage_captions_check_box, False)
 
+    def update_captions_options_type(self, index):
+        options_type = CaptionsOptionsType(index)
+        if options_type == CaptionsOptionsType.Disable:
+            set_checked(self.manage_captions_check_box, False)
+            self.manage_captions_label.hide()
+            self.manage_captions_check_box.hide()
+            self.captions_count_label.hide()
+            self.captions_count_spin_box.hide()
+            self.captions_position_label.hide()
+            self.captions_position_spin_box.hide()
+        elif options_type == CaptionsOptionsType.Single:
+            self.captions_count_spin_box.setValue(1)
+            self.manage_captions_label.show()
+            self.manage_captions_check_box.show()
+            self.captions_count_label.hide()
+            self.captions_count_spin_box.hide()
+            self.captions_position_label.hide()
+            self.captions_position_spin_box.hide()
+        elif options_type == CaptionsOptionsType.Multiple:
+            self.manage_captions_label.show()
+            self.manage_captions_check_box.show()
+            self.captions_count_label.show()
+            self.captions_count_spin_box.show()
+            self.captions_position_label.show()
+            self.captions_position_spin_box.show()
+
+
     def new_program(self):
         self.save_program()
         clone = copy.deepcopy(self.program)
@@ -351,6 +397,7 @@ class GUI(QMainWindow):
         self.play_key_line_edit.setText(program.play_key)
         self.captions_key_line_edit.setText(program.captions_key)
         self.keep_awake_key_line_edit.setText(program.keep_awake_key)
+        self.captions_options_type_combo_box.setCurrentIndex(program.captions_options_type.value)
         self.captions_time_spin_box.setValue(program.playing_captions_time)
         set_checked(self.lingering_captions_check_box, program.lingering_captions)
         set_checked(self.pre_captions_check_box, program.pre_captions)
@@ -373,6 +420,7 @@ class GUI(QMainWindow):
         self.program.play_key = save_key(self.program.play_key, self.play_key_line_edit)
         self.program.captions_key = save_key(self.program.captions_key, self.captions_key_line_edit)
         self.program.keep_awake_key = save_key(self.program.keep_awake_key, self.keep_awake_key_line_edit)
+        self.program.caption_options_type = CaptionsOptionsType(self.captions_options_type_combo_box.currentIndex())
         self.program.playing_captions_time = self.captions_time_spin_box.value()
         self.program.lingering_captions = is_checked(self.lingering_captions_check_box)
         self.program.pre_captions = is_checked(self.pre_captions_check_box)
@@ -413,6 +461,7 @@ class Program:
     end_breathing: bool = True
     captions_count: int = 1
     captions_position: int = 1
+    captions_options_type: CaptionsOptionsType = CaptionsOptionsType.Single
     additional_captions_time: float = 0.1
     idle_time: int = 250
 
