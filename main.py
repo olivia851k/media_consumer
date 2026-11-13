@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtGui import QShortcut, QAction, QKeySequence
 from pynput import keyboard
 from functools import partial
 from watch_state import *
@@ -100,8 +100,12 @@ def save_key(current_key, line_edit):
         return current_key
 
 class GUI(QMainWindow):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
+        self.app = app
+        self.min_font_size = 6
+        self.max_font_size = 36
+        self.default_font_size = self.font_size
         program_list = ['vlc', 'youtube', 'natcol']
         self.programs = {}
         for program_name in program_list:
@@ -250,6 +254,17 @@ class GUI(QMainWindow):
         self.setWindowTitle('Media Consumer')
         self.setGeometry(2000, 200, 400, 600)
 
+        zoom_in_action = QAction('Zoom in', self)
+        zoom_in_action.setShortcut(QKeySequence.StandardKey.ZoomIn)
+        zoom_in_action.triggered.connect(self.zoom_in)
+        zoom_out_action = QAction('Zoom out', self)
+        zoom_out_action.setShortcut(QKeySequence.StandardKey.ZoomOut)
+        zoom_out_action.triggered.connect(self.zoom_out)
+        zoom_reset_action = QAction('Zoom reset', self)
+        zoom_reset_action.setShortcut(QKeySequence('Ctrl+0'))
+        zoom_reset_action.triggered.connect(self.zoom_reset)
+        self.addActions([zoom_in_action, zoom_out_action, zoom_reset_action])
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout()
@@ -292,13 +307,41 @@ class GUI(QMainWindow):
     @property
     def end_breathing(self):
         return is_checked(self.end_breathing_check_box)
+    @property
+    def font(self):
+        return self.app.font()
+    @property
+    def font_size(self):
+        return self.font.pointSize()
 
+    def set_font_size(self, pt):
+        new_pt = max(self.min_font_size, min(pt, self.max_font_size))
+        font = self.app.font()
+        font.setPointSize(new_pt)
+        self.app.setFont(font)
+
+    def zoom_in(self):
+        delta = 1
+        if self.font_size >= 14:
+            delta = 2
+        elif self.font_size >= 20:
+            delta = 4
+        self.set_font_size(self.font_size+delta)
+    def zoom_out(self):
+        delta = 4
+        if self.font_size <= 20:
+            delta = 2
+        if self.font_size <= 14:
+            delta = 1
+        self.set_font_size(self.font_size-delta)
+    def zoom_reset(self):
+        self.set_font_size(self.default_font_size)
 
     def update_stats(self):
         watch_time = self.playing_time * self.iterations
         watch_time_min = watch_time//60
         watch_time_sec = watch_time%60
-        self.watch_time_label.setText(f'Watch Time  {watch_time_min}m {watch_time_sec}s')
+        self.watch_time_label.setText(f'Watch Time {watch_time_min: 2d}m {watch_time_sec:02d}s')
         n_breaths = self.iterations
         if self.start_breathing:
             n_breaths += 1
@@ -307,9 +350,9 @@ class GUI(QMainWindow):
         total_time = watch_time + self.breathing_time * n_breaths
         total_time_min = total_time//60
         total_time_sec = total_time%60
-        self.total_time_label.setText(f'Total Time  {total_time_min}m {total_time_sec}s')
+        self.total_time_label.setText(f'Total Time {total_time_min: 2d}m {total_time_sec:02d}s')
         end_time = datetime.now() + timedelta(seconds=total_time)
-        self.end_time_label.setText(f'End Time  {end_time.hour}:{end_time.minute}')
+        self.end_time_label.setText(f'End Time {end_time.hour: 2d}:{end_time.minute:02d}')
 
     def program_names(self):
         names = list(self.programs.keys())
@@ -603,7 +646,7 @@ class Consumer:
 
 def start_gui():
     app = QApplication(sys.argv)
-    gui = GUI()
+    gui = GUI(app)
     gui.show()
     sys.exit(app.exec())
 
