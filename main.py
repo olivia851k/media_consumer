@@ -2,10 +2,13 @@ import time
 import copy
 import pyautogui
 import sys
+import os
+import json
 from datetime import datetime, timedelta
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from platformdirs import PlatformDirs
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout,
     QTabWidget, QPushButton, QCheckBox, QLineEdit, QComboBox, QSpinBox,
     QLabel, QLineEdit
 )
@@ -99,10 +102,22 @@ def save_key(current_key, line_edit):
     else:
         return current_key
 
+def load_program(program_path):
+    program = None
+    with open(program_path, 'r') as file:
+        data = json.load(file)
+        program = Program(**data)
+    return program
+
+def save_program(program_path, program):
+    with open(program_path, 'w') as file:
+        json.dump(asdict(program), file)
+
 class GUI(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app
+        self.app.aboutToQuit.connect(self.save_program)
         self.min_font_size = 6
         self.max_font_size = 36
         self.default_font_size = self.font_size
@@ -110,18 +125,34 @@ class GUI(QMainWindow):
         self.programs = {}
         for program_name in program_list:
             self.programs[program_name] = Program(program_name)
-        self.program = self.programs['vlc']
         self.programs['vlc'].captions_key='v'
         self.programs['vlc'].playing_time=300
         self.programs['vlc'].iterations=6
         self.programs['vlc'].start_breathing=True
-        self.programs['vlc'].captions_options_type = CaptionsOptionsType.Multiple
+        self.programs['vlc'].captions_options_type = CaptionsOptionsType.Multiple.value
         self.programs['natcol'].captions_count = 0
         self.programs['natcol'].captions_position = 0
         self.programs['natcol'].playing_time = 80
         self.programs['natcol'].breathing_time = 20
         self.programs['natcol'].play_key = 'k'
         self.resume_i = 0
+        self.dirs = PlatformDirs('media_consumer', appauthor=False, ensure_exists=True)
+        self.data_dir = self.dirs.user_data_path
+        for program_name in program_list:
+            profile_path = f'{self.data_dir}/{program_name}.json'
+            if os.path.exists(profile_path):
+                try:
+                    self.programs[program_name] = load_program(profile_path)
+                    print(f'Found {program_name}.json')
+                except Exception as e:
+                    print(e)
+                    print(f'Error: failed to load {program_name} from {profile_path}')
+                    print(f'Saving default config for {program_name}')
+                    save_program(profile_path, self.programs[program_name])
+            else:
+                save_program(profile_path, self.programs[program_name])
+
+        self.program = self.programs['vlc']
 
         self.init_gui()
 
@@ -178,6 +209,14 @@ class GUI(QMainWindow):
         captions_layout.addWidget(self.captions_position_label)
         captions_layout.addWidget(self.captions_position_spin_box)
 
+        default_layout = QHBoxLayout()
+        self.set_as_default_button = QPushButton('Set as default')
+        self.set_as_default_button.clicked.connect(self.save_program_watch_params)
+        self.restore_default_button = QPushButton('Restore default')
+        self.restore_default_button.clicked.connect(self.load_default_watch_params)
+        default_layout.addWidget(self.set_as_default_button)
+        default_layout.addWidget(self.restore_default_button)
+
         self.watch_button = QPushButton('Watch')
         self.watch_button.clicked.connect(self.watch)
 
@@ -187,6 +226,7 @@ class GUI(QMainWindow):
         tab.addLayout(breathing_layout)
         tab.addLayout(time_stats_layout)
         tab.addLayout(captions_layout)
+        tab.addLayout(default_layout)
         tab.addWidget(self.watch_button)
 
         tab_widget.setLayout(tab)
@@ -440,12 +480,21 @@ class GUI(QMainWindow):
         self.play_key_line_edit.setText(program.play_key)
         self.captions_key_line_edit.setText(program.captions_key)
         self.keep_awake_key_line_edit.setText(program.keep_awake_key)
-        self.captions_options_type_combo_box.setCurrentIndex(program.captions_options_type.value)
+        self.captions_options_type_combo_box.setCurrentIndex(program.captions_options_type)
         self.captions_time_spin_box.setValue(program.playing_captions_time)
         set_checked(self.lingering_captions_check_box, program.lingering_captions)
         set_checked(self.pre_captions_check_box, program.pre_captions)
 
-    def save_program(self):
+    def load_default_watch_params(self):
+        program_path = f'{self.data_dir}/{self.program.name}.json'
+        old_program = load_program(program_path)
+        self.program.load_watch_params(old_program)
+        self.load_program(self.program)
+
+    def save_program_watch_params(self):
+        self.save_program(True)
+
+    def save_program(self, save_watch_params=False):
         self.program.iterations = self.iterations
         self.program.playing_time = self.playing_time
         self.program.breathing_time = self.breathing_time
@@ -467,6 +516,12 @@ class GUI(QMainWindow):
         self.program.playing_captions_time = self.captions_time_spin_box.value()
         self.program.lingering_captions = is_checked(self.lingering_captions_check_box)
         self.program.pre_captions = is_checked(self.pre_captions_check_box)
+        program_path = f'{self.data_dir}/{self.program.name}.json'
+        new_program = copy.deepcopy(self.program)
+        if not save_watch_params:
+            old_program = load_program(program_path)
+            new_program.load_watch_params(old_program)
+        save_program(program_path, new_program)
 
     def new_consumer(self):
         self.save_program()
@@ -493,6 +548,7 @@ class Program:
     play_key: str = 'space'
     captions_key: str = 'c'
     fullscreen_key: str = 'f'
+    keep_awake_key: str = "'"
     
     iterations: int = 3
     playing_time: int = 90
@@ -504,16 +560,9 @@ class Program:
     end_breathing: bool = True
     captions_count: int = 1
     captions_position: int = 1
-    captions_options_type: CaptionsOptionsType = CaptionsOptionsType.Single
+    captions_options_type: int = CaptionsOptionsType.Single.value
     additional_captions_time: float = 0.1
     idle_time: int = 250
-
-    def __init__(self, name):
-        self.name = name
-        self.captions_key = 'c'
-        self.fullscreen_key = 'f'
-        self.play_key = 'space'
-        self.keep_awake_key = "'"
 
     def press(self, action):
         if action == WatchAction.ENABLE_CAPTIONS or action == WatchAction.DISABLE_CAPTIONS:
@@ -558,6 +607,16 @@ class Program:
                     self.press(action)
         else:
             self.press(action)
+
+    def load_watch_params(self, program):
+        self.iterations = program.iterations
+        self.playing_time = program.playing_time
+        self.breathing_time = program.breathing_time
+        self.start_breathing = program.start_breathing
+        self.end_breathing = program.end_breathing
+        self.captions_count = program.captions_count
+        self.captions_position = program.captions_position
+
 
 
 # interactive style watch :)
